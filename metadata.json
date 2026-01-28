@@ -1,0 +1,7 @@
+{
+  "name": "Livre Magique Lab",
+  "description": "A professional AI-powered story creator that generates high-quality 32-page storybooks with custom characters and beautiful visual styles.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
