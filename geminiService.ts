@@ -266,7 +266,7 @@ export const analyzeImage = async (imageUrl: string, prompt: string): Promise<st
   const base64 = imageUrl.split(',')[1];
 
   console.log("Analyzing Image...");
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const result = await model.generateContent([
     { inlineData: { mimeType: 'image/png', data: base64 } },
