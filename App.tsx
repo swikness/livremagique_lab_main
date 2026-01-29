@@ -261,6 +261,13 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[uiLanguage];
 
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(null), 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
