@@ -4,15 +4,17 @@ import { UserInput, StoryStyle, Scene, StoryPlan, TargetAudience } from "./types
 // Always initialize with the exact API key
 const getFreshAI = () => {
   // Check localStorage first
-  const customKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY') : null;
-  if (customKey) {
-    console.log("Initializing Gemini Client with CUSTOM KEY from localStorage...");
+  let customKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY') : null;
+
+  // Basic validation: must be string, not empty, not 'null', not 'undefined', and reasonable length (e.g. > 10 chars)
+  if (customKey && customKey.trim().length > 10 && customKey !== 'null' && customKey !== 'undefined') {
+    console.log(`Initializing Gemini Client with CUSTOM KEY from localStorage (Ends with: ${customKey.slice(-4)})`);
     return new GoogleGenerativeAI(customKey);
   }
 
   // Hardcoded API Key as requested by user for private deployment
   const apiKey = "AIzaSyBznbIJP1Ti3k1MUSShb9RrD_W9h6-9T8A";
-  console.log("Initializing Gemini Client (Web) with hardcoded key...");
+  console.log("Initializing Gemini Client (Web) with hardcoded fallback key...");
   return new GoogleGenerativeAI(apiKey);
 };
 
