@@ -3,9 +3,23 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { UserInput, StoryStyle, Scene, StoryPlan, TargetAudience } from "./types";
 
 // Always initialize with the exact API key from environment as per guidelines
+// Always initialize with the exact API key from environment as per guidelines
 const getFreshAI = () => {
   console.log("Initializing Gemini Client...");
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Prioritize VITE_ prefixed env var for standard Vite behavior
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
+
+  if (!apiKey) {
+    const errorMsg = "CRITICAL ERROR: API Key is missing. \n\nPlease ensuring you have set 'VITE_GEMINI_API_KEY' in your Vercel Environment Variables and Redeployed.";
+    console.error(errorMsg);
+    alert(errorMsg); // Alert the user directly in the browser
+    throw new Error("API Key is missing");
+  }
+
+  // Log first few chars to verify it's loaded (security safe-ish for local debug, but helpful here)
+  console.log("API Key loaded:", apiKey.substring(0, 5) + "...");
+
+  return new GoogleGenAI({ apiKey });
 };
 
 const STYLE_DESCRIPTIONS = {
