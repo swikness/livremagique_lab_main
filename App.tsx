@@ -4,9 +4,10 @@ import Cropper from 'react-easy-crop';
 import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage } from './geminiService';
+import { ApiKeyInput } from './ApiKeyInput';
 
 const THEME_OPTIONS = [
-  "Amour", "Amitié", "Courage", "Environnement", "Mystère", 
+  "Amour", "Amitié", "Courage", "Environnement", "Mystère",
   "Aventure", "Magie", "Espace", "Histoire", "Futuriste",
   "Persévérance", "Humour", "Famille", "Nature", "Animaux",
   "Super-héros", "Pirates", "Chevaliers", "Dinosaures", "Découverte",
@@ -241,7 +242,7 @@ const App: React.FC = () => {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [customOption, setCustomOption] = useState<string>('');
   const [selectedYearsCount, setSelectedYearsCount] = useState<string>('2');
-  
+
   const [storyPlan, setStoryPlan] = useState<StoryPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
@@ -286,7 +287,7 @@ const App: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'age') {
       const ageNum = parseInt(value);
       if (!isNaN(ageNum) && ageNum > 18 && userInput.audience !== TargetAudience.LOVERS) {
@@ -306,8 +307,8 @@ const App: React.FC = () => {
       const exists = prev.selectedThemes.includes(tag);
       return {
         ...prev,
-        selectedThemes: exists 
-          ? prev.selectedThemes.filter(t => t !== tag) 
+        selectedThemes: exists
+          ? prev.selectedThemes.filter(t => t !== tag)
           : [...prev.selectedThemes, tag]
       };
     });
@@ -368,10 +369,10 @@ const App: React.FC = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return ['', ''];
-    
+
     const halfWidth = image.width / 2;
     const height = image.height;
-    
+
     canvas.width = halfWidth;
     canvas.height = height;
 
@@ -431,7 +432,7 @@ const App: React.FC = () => {
   const saveCrop = async () => {
     if (imageToCrop && croppedAreaPixels) {
       const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels);
-      
+
       if (cropTarget === 'reference') {
         setUserInput(prev => ({ ...prev, photoBase64: croppedImage }));
       } else if (cropTarget === 'partner') {
@@ -485,21 +486,21 @@ const App: React.FC = () => {
     const missing = [];
     if (!userInput.name.trim()) missing.push(t.name);
     if (!userInput.photoBase64) missing.push(t.uploadPhoto);
-    
+
     let finalTheme = userInput.theme;
     if (userInput.audience === TargetAudience.LOVERS) {
-        if (!userInput.partnerName?.trim()) missing.push(t.partnerIdentity + " " + t.name);
-        if (!userInput.partnerPhotoBase64) missing.push(t.partnerIdentity + " Photo");
-        if (!loversStoryType) missing.push("Story Type");
-        
-        if (selectedOptions.length === 0) {
-          missing.push("Selections (min 1)");
-        } else {
-          const context = loversStoryType === 'LOVE_STORY' ? ` Specifically covering ${selectedYearsCount} years of love.` : '';
-          finalTheme = `Story Type: ${loversStoryType}.${context} Recipient: ${recipientType}. Key milestones chosen by user: ${selectedOptions.join(' | ')}`;
-        }
+      if (!userInput.partnerName?.trim()) missing.push(t.partnerIdentity + " " + t.name);
+      if (!userInput.partnerPhotoBase64) missing.push(t.partnerIdentity + " Photo");
+      if (!loversStoryType) missing.push("Story Type");
+
+      if (selectedOptions.length === 0) {
+        missing.push("Selections (min 1)");
+      } else {
+        const context = loversStoryType === 'LOVE_STORY' ? ` Specifically covering ${selectedYearsCount} years of love.` : '';
+        finalTheme = `Story Type: ${loversStoryType}.${context} Recipient: ${recipientType}. Key milestones chosen by user: ${selectedOptions.join(' | ')}`;
+      }
     } else {
-        if (!userInput.theme.trim()) missing.push(t.storyBlueprint);
+      if (!userInput.theme.trim()) missing.push(t.storyBlueprint);
     }
 
     if (missing.length > 0) {
@@ -682,7 +683,7 @@ const App: React.FC = () => {
   const getStoryTypeOptions = () => {
     if (!loversStoryType) return [];
     if (loversStoryType === '10_REASONS') {
-        return recipientType === 'HER' ? LOVERS_OPTIONS_MAPPING.HER : LOVERS_OPTIONS_MAPPING.HIM;
+      return recipientType === 'HER' ? LOVERS_OPTIONS_MAPPING.HER : LOVERS_OPTIONS_MAPPING.HIM;
     }
     return (LOVERS_OPTIONS_MAPPING as any)[loversStoryType] || [];
   };
@@ -727,25 +728,25 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="relative h-[500px] bg-black">
-              <Cropper 
-                image={imageToCrop} 
-                crop={crop} 
-                zoom={zoom} 
-                aspect={cropTarget === 'scene' ? 2 : 1} 
-                onCropChange={setCrop} 
-                onCropComplete={onCropComplete} 
-                onZoomChange={setZoom} 
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                aspect={cropTarget === 'scene' ? 2 : 1}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
               />
             </div>
             <div className="p-6 flex flex-col md:flex-row justify-between items-center bg-slate-900 gap-4">
-               <div className="flex-1 w-full flex items-center gap-4">
-                 <i className="fas fa-search-minus text-slate-500"></i>
-                 <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-amber-400" />
-                 <i className="fas fa-search-plus text-slate-500"></i>
-               </div>
-               <button onClick={saveCrop} className="px-10 py-3 bg-amber-400 text-slate-950 rounded-full font-bold shadow-lg shadow-amber-400/20 uppercase tracking-widest text-sm">
-                 {uiLanguage === 'French' ? 'Appliquer' : 'Apply'}
-               </button>
+              <div className="flex-1 w-full flex items-center gap-4">
+                <i className="fas fa-search-minus text-slate-500"></i>
+                <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-amber-400" />
+                <i className="fas fa-search-plus text-slate-500"></i>
+              </div>
+              <button onClick={saveCrop} className="px-10 py-3 bg-amber-400 text-slate-950 rounded-full font-bold shadow-lg shadow-amber-400/20 uppercase tracking-widest text-sm">
+                {uiLanguage === 'French' ? 'Appliquer' : 'Apply'}
+              </button>
             </div>
           </div>
         </div>
@@ -753,8 +754,8 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 right-0 flex gap-2">
-            <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
-            <button onClick={() => setUiLanguage('English')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'English' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>EN</button>
+          <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
+          <button onClick={() => setUiLanguage('English')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'English' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>EN</button>
         </div>
         <h1 className="text-6xl font-magic bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text text-transparent mb-2">{t.appTitle}</h1>
         <p className="text-slate-400 tracking-widest text-sm uppercase">{t.subtitle}</p>
@@ -773,10 +774,10 @@ const App: React.FC = () => {
         {step === AppStep.INPUT && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              
+
               <div className="lg:col-span-6 space-y-8">
                 <h3 className="text-xl font-bold text-amber-100 flex items-center gap-2"><i className="fas fa-id-card text-amber-400"></i> {t.characterIdentity}</h3>
-                
+
                 <div className="bg-slate-800/30 p-6 rounded-2xl border border-slate-700 space-y-6">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-xs">1</span>
@@ -820,7 +821,7 @@ const App: React.FC = () => {
                 </div>
 
                 {userInput.audience === TargetAudience.LOVERS && (
-                   <div className="bg-pink-900/10 p-6 rounded-2xl border border-pink-500/30 space-y-6 animate-in slide-in-from-left duration-300">
+                  <div className="bg-pink-900/10 p-6 rounded-2xl border border-pink-500/30 space-y-6 animate-in slide-in-from-left duration-300">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">2</span>
                       <h4 className="font-bold text-pink-400 uppercase text-xs tracking-widest">{t.partnerIdentity}</h4>
@@ -866,7 +867,7 @@ const App: React.FC = () => {
 
               <div className="lg:col-span-6 space-y-8">
                 <h3 className="text-xl font-bold text-amber-100 flex items-center gap-2"><i className="fas fa-pen-nib text-amber-400"></i> {t.storyBlueprint}</h3>
-                
+
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.targetAudience}</label>
                   <div className="flex gap-2">
@@ -878,20 +879,20 @@ const App: React.FC = () => {
 
                 <div className="space-y-3">
                   <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.themeDetails}</label>
-                  
+
                   {userInput.audience === TargetAudience.LOVERS ? (
                     <div className="space-y-4 animate-in fade-in duration-300">
-                      
+
                       <div className="space-y-1">
                         <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
                         <div className="flex gap-2">
-                          <button 
+                          <button
                             onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
                             className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
                           >
                             <i className="fas fa-female"></i> {t.toHer}
                           </button>
-                          <button 
+                          <button
                             onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
                             className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
                           >
@@ -901,21 +902,21 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-1 gap-2">
-                        <button 
+                        <button
                           onClick={() => { setLoversStoryType('10_REASONS'); setSelectedOptions([]); setCustomOption(''); }}
                           className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === '10_REASONS' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                         >
                           <i className="fas fa-list-ol"></i>
                           <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book1Title(userInput.partnerName, recipientType)}</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => { setLoversStoryType('LOVE_STORY'); setSelectedOptions([]); setCustomOption(''); }}
                           className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'LOVE_STORY' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                         >
                           <i className="fas fa-heart"></i>
                           <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book2Title(userInput.name, userInput.partnerName, selectedYearsCount)}</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => { setLoversStoryType('BUCKET_LIST'); setSelectedOptions([]); setCustomOption(''); }}
                           className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'BUCKET_LIST' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                         >
@@ -929,8 +930,8 @@ const App: React.FC = () => {
                           {loversStoryType === 'LOVE_STORY' && (
                             <div className="space-y-1 mb-2">
                               <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
-                              <select 
-                                value={selectedYearsCount} 
+                              <select
+                                value={selectedYearsCount}
                                 onChange={(e) => setSelectedYearsCount(e.target.value)}
                                 className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs font-bold uppercase"
                               >
@@ -940,15 +941,15 @@ const App: React.FC = () => {
                           )}
 
                           <div className="flex justify-between items-center px-1">
-                             <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                               {t.chooseOptions}
-                             </h5>
-                             <span className={`text-[10px] font-bold ${selectedOptions.length === 10 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 10</span>
+                            <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                              {t.chooseOptions}
+                            </h5>
+                            <span className={`text-[10px] font-bold ${selectedOptions.length === 10 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 10</span>
                           </div>
-                          
+
                           <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                             {selectedOptions.filter(opt => !getStoryTypeOptions().includes(opt)).map((opt, idx) => (
-                              <button 
+                              <button
                                 key={`custom-${idx}`}
                                 onClick={() => toggleLoversOption(opt)}
                                 className="text-left p-3 rounded-xl text-xs transition-all border bg-pink-600 border-pink-600 text-white font-bold flex justify-between items-center"
@@ -958,7 +959,7 @@ const App: React.FC = () => {
                               </button>
                             ))}
                             {getStoryTypeOptions().map((opt, idx) => (
-                              <button 
+                              <button
                                 key={idx}
                                 onClick={() => toggleLoversOption(opt)}
                                 className={`text-left p-3 rounded-xl text-xs transition-all border flex justify-between items-center ${selectedOptions.includes(opt) ? 'bg-pink-500 border-pink-500 text-white font-bold' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'}`}
@@ -970,43 +971,43 @@ const App: React.FC = () => {
                           </div>
 
                           <div className="space-y-1.5 pt-2 border-t border-slate-700/50">
-                             <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
-                             <div className="relative">
-                               <input 
-                                 value={customOption} 
-                                 onChange={(e) => setCustomOption(e.target.value)}
-                                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
-                                 className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
-                                 placeholder={
-                                   loversStoryType === '10_REASONS' ? t.placeholderReasons :
-                                   loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
-                                   t.placeholderBucket
-                                 }
-                               />
-                               <button 
-                                 onClick={handleAddCustomOption}
-                                 className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
-                               >
-                                 <i className="fas fa-check"></i>
-                               </button>
-                             </div>
+                            <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
+                            <div className="relative">
+                              <input
+                                value={customOption}
+                                onChange={(e) => setCustomOption(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
+                                className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
+                                placeholder={
+                                  loversStoryType === '10_REASONS' ? t.placeholderReasons :
+                                    loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
+                                      t.placeholderBucket
+                                }
+                              />
+                              <button
+                                onClick={handleAddCustomOption}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
+                              >
+                                <i className="fas fa-check"></i>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
                   ) : (
                     <>
-                      <textarea 
-                        name="theme" 
-                        value={userInput.theme} 
-                        onChange={handleInputChange} 
-                        className="w-full h-24 bg-slate-800/50 p-4 rounded-xl border border-slate-700 focus:border-amber-400 outline-none" 
-                        placeholder={t.placeholderTheme} 
+                      <textarea
+                        name="theme"
+                        value={userInput.theme}
+                        onChange={handleInputChange}
+                        className="w-full h-24 bg-slate-800/50 p-4 rounded-xl border border-slate-700 focus:border-amber-400 outline-none"
+                        placeholder={t.placeholderTheme}
                       />
                       <div className="flex flex-wrap gap-2 pt-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                         {THEME_OPTIONS.map(theme => (
-                          <button 
-                            key={theme} 
+                          <button
+                            key={theme}
                             onClick={() => toggleThemeTag(theme)}
                             className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${userInput.selectedThemes.includes(theme) ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500 hover:border-slate-500'}`}
                           >
@@ -1068,7 +1069,7 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
-            
+
             <div className="text-center pt-10">
               <button disabled={loading} onClick={handleGeneratePlan} className="group px-16 py-5 bg-amber-400 text-slate-950 font-bold rounded-full hover:bg-amber-500 transition-all shadow-xl shadow-amber-400/20 text-lg uppercase tracking-widest flex items-center gap-4 mx-auto disabled:opacity-50">
                 {loading ? <i className="fas fa-spinner animate-spin"></i> : <><i className="fas fa-magic"></i> {t.generateSynopsis}</>}
@@ -1080,14 +1081,14 @@ const App: React.FC = () => {
         {step === AppStep.PLANNING && storyPlan && (
           <div className="space-y-8 animate-in slide-in-from-right duration-500">
             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-xl font-bold text-amber-400 font-magic">{t.synopsisTitle} ({userInput.language})</h3>
-               <button onClick={handleCopyAllPrompts} className="bg-amber-400/10 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
-                  <i className={`fas ${copySuccess ? 'fa-check text-green-400' : 'fa-copy'}`}></i>
-                  {copySuccess ? 'Copied!' : t.copyPrompts}
-               </button>
+              <h3 className="text-xl font-bold text-amber-400 font-magic">{t.synopsisTitle} ({userInput.language})</h3>
+              <button onClick={handleCopyAllPrompts} className="bg-amber-400/10 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+                <i className={`fas ${copySuccess ? 'fa-check text-green-400' : 'fa-copy'}`}></i>
+                {copySuccess ? 'Copied!' : t.copyPrompts}
+              </button>
             </div>
             <div className="bg-slate-800/40 p-6 rounded-3xl border border-slate-700 shadow-inner">
-              <textarea value={storyPlan.synopsis} onChange={(e) => setStoryPlan({...storyPlan, synopsis: e.target.value})} className="w-full h-40 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 outline-none italic leading-relaxed text-amber-100/90" />
+              <textarea value={storyPlan.synopsis} onChange={(e) => setStoryPlan({ ...storyPlan, synopsis: e.target.value })} className="w-full h-40 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 outline-none italic leading-relaxed text-amber-100/90" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {storyPlan.scenes.map((scene, idx) => (
@@ -1135,7 +1136,7 @@ const App: React.FC = () => {
                       <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">{t.artStyle} Override</label>
                       <div className="flex gap-2">
                         {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.VECTOR_ART].map(s => (
-                          <button key={s} onClick={() => handleOverrideStyle(currentSceneIndex, s)} className={`flex-1 py-2 rounded-xl text-[9px] font-black border-2 ${ (storyPlan.scenes[currentSceneIndex].overrideStyle || userInput.style) === s ? 'bg-amber-400 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-500' }`}>{s.split(' ')[0]}</button>
+                          <button key={s} onClick={() => handleOverrideStyle(currentSceneIndex, s)} className={`flex-1 py-2 rounded-xl text-[9px] font-black border-2 ${(storyPlan.scenes[currentSceneIndex].overrideStyle || userInput.style) === s ? 'bg-amber-400 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{s.split(' ')[0]}</button>
                         ))}
                       </div>
                     </div>
@@ -1196,22 +1197,22 @@ const App: React.FC = () => {
                   )}
                   {storyPlan.scenes[currentSceneIndex].status === 'loading' && (
                     <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center p-10 z-20">
-                       <i className="fas fa-magic text-amber-400 text-7xl animate-pulse mb-4"></i>
-                       <p className="text-amber-400 font-magic text-2xl">{t.generatingArt}</p>
+                      <i className="fas fa-magic text-amber-400 text-7xl animate-pulse mb-4"></i>
+                      <p className="text-amber-400 font-magic text-2xl">{t.generatingArt}</p>
                     </div>
                   )}
                 </div>
-                
+
                 {storyPlan.scenes[currentSceneIndex].history.length > 0 && (
                   <div className="bg-slate-950/30 p-4 rounded-3xl border border-slate-800/50">
                     <div className="flex items-center justify-between mb-3 px-2">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.versionHistory} ({storyPlan.scenes[currentSceneIndex].history.length} versions)</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.versionHistory} ({storyPlan.scenes[currentSceneIndex].history.length} versions)</span>
                     </div>
                     <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar no-scrollbar-md">
                       {storyPlan.scenes[currentSceneIndex].history.map((histUrl, hIdx) => (
                         <div key={hIdx} className="relative group flex-shrink-0">
-                          <button 
-                            onClick={() => restoreFromHistory(currentSceneIndex, histUrl)} 
+                          <button
+                            onClick={() => restoreFromHistory(currentSceneIndex, histUrl)}
                             className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-slate-800 hover:border-amber-400 transition-all block"
                           >
                             <img src={histUrl} className="w-full h-full object-cover" />
@@ -1234,9 +1235,9 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
-      
+
       <footer className="mt-16 text-center text-slate-700 text-[10px] font-black uppercase tracking-[0.3em] pb-10">
-         <p>&copy; 2025 {t.appTitle} &bull; CUSTOMIZED ADVENTURES</p>
+        <p>&copy; 2025 {t.appTitle} &bull; CUSTOMIZED ADVENTURES</p>
       </footer>
     </div>
   );
