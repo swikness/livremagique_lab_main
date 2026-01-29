@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { setCustomApiKey, getCustomApiKey } from '../geminiService';
+import { setCustomApiKey, getCustomApiKey } from './geminiService';
 
 export const ApiKeyInput: React.FC = () => {
     const [key, setKey] = useState('');
