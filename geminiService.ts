@@ -47,7 +47,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   const genAI = getFreshAI();
   // Using gemini-1.5-pro as it is the stable web-supported model that supports JSON schema well.
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.0-flash',
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -282,7 +282,7 @@ export const describeAsset = async (base64Photo: string, assetType: string): Pro
 
   console.log(`Describing Asset: ${assetType}`);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.0-flash',
     generationConfig: { responseMimeType: "application/json" }
   });
 
