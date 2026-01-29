@@ -221,7 +221,7 @@ const LOVERS_OPTIONS_MAPPING = {
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
   const [uiLanguage, setUiLanguage] = useState<'French' | 'English'>('French');
-  const [isKeyChecking, setIsKeyChecking] = useState(true);
+  const [isKeyChecking, setIsKeyChecking] = useState(false);
   const [userInput, setUserInput] = useState<UserInput>({
     name: '',
     age: '',
@@ -261,29 +261,7 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[uiLanguage];
 
-  useEffect(() => {
-    checkKey();
-  }, []);
 
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => setErrorMessage(null), 7000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage]);
-
-  const checkKey = async () => {
-    try {
-      const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
-      if (!hasKey) {
-        await (window as any).aistudio?.openSelectKey();
-      }
-    } catch (e) {
-      console.error("API Key selection failed", e);
-    } finally {
-      setIsKeyChecking(false);
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -688,14 +666,7 @@ const App: React.FC = () => {
     return (LOVERS_OPTIONS_MAPPING as any)[loversStoryType] || [];
   };
 
-  if (isKeyChecking) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
-      <div className="text-center glass-morphism p-10 rounded-3xl">
-        <i className="fas fa-magic text-amber-400 text-6xl mb-6 animate-pulse"></i>
-        <h1 className="text-3xl font-magic text-white">{t.appTitle}</h1>
-      </div>
-    </div>
-  );
+
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
