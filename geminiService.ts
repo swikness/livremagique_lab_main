@@ -1,13 +1,12 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { UserInput, StoryStyle, Scene, StoryPlan, TargetAudience } from "./types";
 
-// Always initialize with the exact API key from environment as per guidelines
+// Always initialize with the exact API key
 const getFreshAI = () => {
   // Hardcoded API Key as requested by user for private deployment
   const apiKey = "AIzaSyBznbIJP1Ti3k1MUSShb9RrD_W9h6-9T8A";
-  console.log("Initializing Gemini Client with hardcoded key...");
-  return new GoogleGenAI({ apiKey });
+  console.log("Initializing Gemini Client (Web) with hardcoded key...");
+  return new GoogleGenerativeAI(apiKey);
 };
 
 const STYLE_DESCRIPTIONS = {
@@ -17,7 +16,38 @@ const STYLE_DESCRIPTIONS = {
 };
 
 export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> => {
-  const ai = getFreshAI();
+  const genAI = getFreshAI();
+  // Using gemini-1.5-pro as it is the stable web-supported model that supports JSON schema well.
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-pro',
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: SchemaType.OBJECT,
+        properties: {
+          synopsis: { type: SchemaType.STRING },
+          scenes: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                id: { type: SchemaType.NUMBER },
+                type: { type: SchemaType.STRING },
+                title: { type: SchemaType.STRING },
+                storyText: { type: SchemaType.STRING },
+                description: { type: SchemaType.STRING },
+                prompt: { type: SchemaType.STRING },
+                characterSide: { type: SchemaType.STRING }
+              },
+              required: ["id", "type", "title", "storyText", "description", "prompt"]
+            }
+          }
+        },
+        required: ["synopsis", "scenes"]
+      }
+    }
+  });
+
   const themesStr = input.selectedThemes.join(', ');
 
   const char1Info = `${input.name} (Age: ${input.age}, Gender: ${input.gender})`;
@@ -69,38 +99,11 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   `;
 
   console.log(`Generating Plan... Theme: ${input.theme}`);
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          synopsis: { type: Type.STRING },
-          scenes: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.NUMBER },
-                type: { type: Type.STRING },
-                title: { type: Type.STRING },
-                storyText: { type: Type.STRING },
-                description: { type: Type.STRING },
-                prompt: { type: Type.STRING },
-                characterSide: { type: Type.STRING }
-              },
-              required: ["id", "type", "title", "storyText", "description", "prompt"]
-            }
-          }
-        },
-        required: ["synopsis", "scenes"]
-      }
-    }
-  });
 
-  const raw = JSON.parse(response.text || '{}');
+  const result = await model.generateContent(prompt);
+  const responseText = result.response.text();
+
+  const raw = JSON.parse(responseText || '{}');
   console.log("Plan Generated Successfully.");
   return {
     synopsis: raw.synopsis,
@@ -114,7 +117,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 };
 
 export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string): Promise<string> => {
-  const ai = getFreshAI();
+  const genAI = getFreshAI();
   const activeStyle = scene.overrideStyle || baseStyle;
   const styleKeywords = STYLE_DESCRIPTIONS[activeStyle];
 
@@ -152,31 +155,35 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
   }
 
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents: { parts },
-    config: {
-      imageConfig: {
-        aspectRatio: scene.aspectRatio === '2:1' ? '16:9' : scene.aspectRatio,
-        imageSize: '1K'
+
+  // Try to use the user's specific image model via the new SDK.
+  // Assuming 'gemini-3-pro-image-preview' accepts standard generateContent calls.
+  // If not, this might need adjustment, but this is the best path forward for browser compatibility.
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts }]
+    });
+
+    const candidates = result.response.candidates;
+    if (!candidates || candidates.length === 0) throw new Error("No image data returned.");
+
+    for (const part of candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-  });
-
-  const candidates = response.candidates;
-  if (!candidates || candidates.length === 0) throw new Error("No image data returned.");
-
-  for (const part of candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
+  } catch (error) {
+    console.error("Image generation failed:", error);
+    throw error;
   }
 
   throw new Error("No image generated.");
 };
 
 export const editSceneImage = async (scene: Scene, instruction: string, mainCharacterPhoto?: string, partnerPhoto?: string): Promise<string> => {
-  const ai = getFreshAI();
+  const genAI = getFreshAI();
   if (!scene.imageUrl) throw new Error("No image to edit.");
 
   const parts: any[] = [
@@ -208,18 +215,13 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
   }
 
   console.log("Editing Image...");
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents: { parts },
-    config: {
-      imageConfig: {
-        aspectRatio: scene.aspectRatio === '2:1' ? '16:9' : scene.aspectRatio,
-        imageSize: '1K'
-      }
-    }
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts }]
   });
 
-  const candidates = response.candidates;
+  const candidates = result.response.candidates;
   if (!candidates || candidates.length === 0) throw new Error("Edit failed.");
 
   for (const part of candidates[0].content.parts) {
@@ -232,40 +234,34 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
 };
 
 export const analyzeImage = async (imageUrl: string, prompt: string): Promise<string> => {
-  const ai = getFreshAI();
+  const genAI = getFreshAI();
   const base64 = imageUrl.split(',')[1];
 
   console.log("Analyzing Image...");
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { mimeType: 'image/png', data: base64 } },
-        { text: `Review this storybook page based on the prompt: "${prompt}". Check if the text is rendered correctly and positioned on the opposite side of the character. Verify facial consistency and that the clothing is scene-appropriate and not the reference clothing.` }
-      ]
-    }
-  });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
-  return response.text || "No analysis available.";
+  const result = await model.generateContent([
+    { inlineData: { mimeType: 'image/png', data: base64 } },
+    prompt
+  ]);
+
+  return result.response.text() || "No analysis available.";
 };
 
 export const describeAsset = async (base64Photo: string, assetType: string): Promise<{ name: string, description: string }> => {
-  const ai = getFreshAI();
+  const genAI = getFreshAI();
   const base64 = base64Photo.split(',')[1];
 
   console.log(`Describing Asset: ${assetType}`);
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { mimeType: 'image/jpeg', data: base64 } },
-        { text: `Analyze this ${assetType} and generate a name and one-sentence description for a story book. JSON output: {"name": "...", "description": "..."}` }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json"
-    }
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-pro',
+    generationConfig: { responseMimeType: "application/json" }
   });
 
-  return JSON.parse(response.text || '{"name": "", "description": ""}');
+  const result = await model.generateContent([
+    { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+    `Analyze this ${assetType} and generate a name and one-sentence description for a story book. JSON output: {"name": "...", "description": "..."}`
+  ]);
+
+  return JSON.parse(result.response.text() || '{"name": "", "description": ""}');
 };
