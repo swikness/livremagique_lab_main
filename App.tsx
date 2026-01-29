@@ -221,7 +221,7 @@ const LOVERS_OPTIONS_MAPPING = {
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
   const [uiLanguage, setUiLanguage] = useState<'French' | 'English'>('French');
-  const [isKeyChecking, setIsKeyChecking] = useState(false);
+
   const [userInput, setUserInput] = useState<UserInput>({
     name: '',
     age: '',
