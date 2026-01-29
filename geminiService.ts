@@ -3,10 +3,28 @@ import { UserInput, StoryStyle, Scene, StoryPlan, TargetAudience } from "./types
 
 // Always initialize with the exact API key
 const getFreshAI = () => {
+  // Check localStorage first
+  const customKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY') : null;
+  if (customKey) {
+    console.log("Initializing Gemini Client with CUSTOM KEY from localStorage...");
+    return new GoogleGenerativeAI(customKey);
+  }
+
   // Hardcoded API Key as requested by user for private deployment
   const apiKey = "AIzaSyBznbIJP1Ti3k1MUSShb9RrD_W9h6-9T8A";
   console.log("Initializing Gemini Client (Web) with hardcoded key...");
   return new GoogleGenerativeAI(apiKey);
+};
+
+export const setCustomApiKey = (key: string) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('GEMINI_API_KEY', key);
+    window.location.reload(); // Reload to ensure services pick it up
+  }
+};
+
+export const getCustomApiKey = () => {
+  return typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY') : null;
 };
 
 const STYLE_DESCRIPTIONS = {
