@@ -12,10 +12,18 @@ const getFreshAI = () => {
     return new GoogleGenerativeAI(customKey);
   }
 
-  // Hardcoded API Key as requested by user for private deployment
-  const apiKey = "AIzaSyBznbIJP1Ti3k1MUSShb9RrD_W9h6-9T8A";
-  console.log("Initializing Gemini Client (Web) with hardcoded fallback key...");
-  return new GoogleGenerativeAI(apiKey);
+  // Check for Vercel Environment Variable
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (envKey && typeof envKey === 'string' && envKey.startsWith('AIza')) {
+    console.log("Initializing Gemini Client with ENV key (VITE_GEMINI_API_KEY)...");
+    return new GoogleGenerativeAI(envKey);
+  }
+
+  console.warn("No API Key found in LocalStorage or Environment Variables.");
+  // Fallback or Error - Ideally we throw here or return a dummy client that errors on use, 
+  // but for now let's let it fail naturally if called.
+  return new GoogleGenerativeAI("MISSING_API_KEY");
 };
 
 export const setCustomApiKey = (key: string) => {
