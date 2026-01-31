@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Cropper from 'react-easy-crop';
 import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
-import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage } from './geminiService';
+import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality } from './geminiService';
 import { ApiKeyInput } from './ApiKeyInput';
 
 const THEME_OPTIONS = [
@@ -281,6 +281,37 @@ const App: React.FC = () => {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
+  // New state for Photo Quality and Control
+  const [photoQuality, setPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
+  const [partnerPhotoQuality, setPartnerPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
+  const stopGenerationRef = useRef(false);
+  const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
+
+  // Sync ref with state
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  // Quality Bar Component
+  const QualityBar = ({ quality }: { quality: { score: number, feedback: string } | null }) => {
+    if (!quality) return null;
+    const getColor = (s: number) => s >= 80 ? 'bg-green-500' : s >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+    return (
+      <div className="mt-3 space-y-1 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+        <div className="flex justify-between items-center text-[9px] font-bold uppercase text-slate-400">
+          <span>Photo Quality</span>
+          <span className={quality.score >= 80 ? 'text-green-400' : quality.score >= 50 ? 'text-yellow-400' : 'text-red-400'}>{quality.score}%</span>
+        </div>
+        <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+          <div className={`h-full ${getColor(quality.score)} transition-all duration-1000`} style={{ width: `${quality.score}%` }}></div>
+        </div>
+        <p className="text-[9px] text-slate-400 leading-tight">{quality.feedback}</p>
+      </div>
+    );
+  };
+
   const t = TRANSLATIONS[uiLanguage];
 
   useEffect(() => {
@@ -404,13 +435,26 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'reference' | 'partner' = 'reference') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'reference' | 'partner' = 'reference') => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
       setCropTarget(target);
-      setImageToCrop(reader.result as string);
+      setImageToCrop(base64);
+
+      // Analyze Quality
+      try {
+        const quality = await analyzePhotoQuality(base64);
+        if (target === 'reference') {
+          setPhotoQuality(quality);
+        } else {
+          setPartnerPhotoQuality(quality);
+        }
+      } catch (err) {
+        console.error("Quality analysis failed", err);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -530,31 +574,67 @@ const App: React.FC = () => {
 
   const handleGenerateAll = async () => {
     if (!storyPlan) return;
-    const newScenes = [...storyPlan.scenes];
+    stopGenerationRef.current = false;
+    isPausedRef.current = false;
+    setIsPaused(false);
 
-    // Mark all as loading first
-    for (const scene of newScenes) {
-      if (scene.status !== 'done') scene.status = 'loading';
-    }
-    setStoryPlan({ ...storyPlan, scenes: newScenes });
+    // Create a copy to track local progress
+    let currentScenes = [...storyPlan.scenes];
 
-    // Process sequentially to avoid rate limits
-    for (let i = 0; i < newScenes.length; i++) {
-      const scene = newScenes[i];
+    // Mark pending scenes as loading
+    const updatedScenes = currentScenes.map(scene => {
+      if (scene.status !== 'done') return { ...scene, status: 'loading' };
+      return scene;
+    });
+    setStoryPlan({ ...storyPlan, scenes: updatedScenes as Scene[] });
+
+    // Process sequentially
+    for (let i = 0; i < updatedScenes.length; i++) {
+      if (stopGenerationRef.current) break;
+
+      // Handle Pause
+      while (isPausedRef.current) {
+        if (stopGenerationRef.current) break;
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      const scene = updatedScenes[i];
       if (scene.status === 'done') continue;
 
       try {
         const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64);
         scene.imageUrl = img;
         scene.status = 'done';
-        // Optimization: Update state after each success so user sees progress
-        setStoryPlan(prev => prev ? ({ ...prev, scenes: [...newScenes] }) : null);
+
+        // Update state to show progress
+        setStoryPlan(prev => {
+          if (!prev) return null;
+          const newSc = [...prev.scenes];
+          newSc[i] = { ...scene }; // Update specific scene
+          return { ...prev, scenes: newSc };
+        });
       } catch (err) {
         console.error(`Failed to generate scene ${i}`, err);
         scene.status = 'error';
-        setStoryPlan(prev => prev ? ({ ...prev, scenes: [...newScenes] }) : null);
+        setStoryPlan(prev => {
+          if (!prev) return null;
+          const newSc = [...prev.scenes];
+          newSc[i] = { ...scene };
+          return { ...prev, scenes: newSc };
+        });
       }
     }
+    setIsGeneratingScenes(false);
+  };
+
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
+
+  const cancelGeneration = () => {
+    stopGenerationRef.current = true;
+    setIsPaused(false);
+    setIsGeneratingScenes(false);
   };
 
   const handleAutoSplitAll = async () => {
@@ -858,10 +938,10 @@ const App: React.FC = () => {
 
       <div className="glass-morphism rounded-3xl p-6 md:p-10 shadow-2xl overflow-hidden min-h-[600px]">
         <div className="flex justify-center gap-4 mb-12">
-          {[AppStep.INPUT, AppStep.PLANNING, AppStep.CREATION].map((s, idx) => (
+          {[AppStep.INPUT, AppStep.CREATION].map((s, idx) => (
             <div key={s} className="flex items-center">
               <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all font-bold ${step === s ? 'border-amber-400 bg-amber-400 text-slate-950 scale-110 shadow-lg shadow-amber-400/20' : 'border-slate-700 text-slate-600'}`}>{idx + 1}</div>
-              {idx < 2 && <div className={`w-12 h-px mx-2 ${step === AppStep.PLANNING || step === AppStep.CREATION ? 'bg-amber-400/50' : 'bg-slate-700'}`} />}
+              {idx < 1 && <div className={`w-12 h-px mx-2 ${step > AppStep.INPUT ? 'bg-amber-400/50' : 'bg-slate-700'}`} />}
             </div>
           ))}
         </div>
@@ -912,6 +992,7 @@ const App: React.FC = () => {
                       )}
                       <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'reference')} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
+                    {userInput.photoBase64 && <QualityBar quality={photoQuality} />}
                   </div>
                 </div>
 
@@ -955,6 +1036,7 @@ const App: React.FC = () => {
                         )}
                         <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'partner')} className="absolute inset-0 opacity-0 cursor-pointer" />
                       </div>
+                      {userInput.partnerPhotoBase64 && <QualityBar quality={partnerPhotoQuality} />}
                     </div>
                   </div>
                 )}
@@ -1173,179 +1255,130 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {step === AppStep.PLANNING && storyPlan && (
-          <div className="space-y-8 animate-in slide-in-from-right duration-500">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-amber-400 font-magic">{t.synopsisTitle} ({userInput.language})</h3>
-              <button onClick={handleCopyAllPrompts} className="bg-amber-400/10 text-amber-400 border border-amber-400/30 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
-                <i className={`fas ${copySuccess ? 'fa-check text-green-400' : 'fa-copy'}`}></i>
-                {copySuccess ? 'Copied!' : t.copyPrompts}
-              </button>
-            </div>
-            <div className="bg-slate-800/40 p-6 rounded-3xl border border-slate-700 shadow-inner">
-              <textarea value={storyPlan.synopsis} onChange={(e) => setStoryPlan({ ...storyPlan, synopsis: e.target.value })} className="w-full h-40 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 outline-none italic leading-relaxed text-amber-100/90" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {storyPlan.scenes.map((scene, idx) => (
-                <div key={idx} className="bg-slate-800/30 p-6 rounded-3xl border border-slate-700 space-y-4 group">
-                  <div className="flex justify-between items-center font-bold text-[10px] uppercase tracking-widest">
-                    <span className={`px-2 py-1 rounded-md ${scene.type === 'front-cover' || scene.type === 'back-cover' ? 'bg-amber-400 text-slate-950' : 'bg-slate-900 text-amber-500'}`}>{scene.type.replace('-', ' ')}</span>
-                    <span className="text-slate-500">{t.page} {idx}</span>
-                  </div>
-                  <input value={scene.title} onChange={(e) => handleEditScene(idx, 'title', e.target.value)} className="w-full bg-transparent border-b border-slate-800 outline-none font-bold text-lg" />
-                  <textarea value={scene.storyText} onChange={(e) => handleEditScene(idx, 'storyText', e.target.value)} className="w-full h-24 bg-slate-900/60 p-3 rounded-xl text-xs text-slate-300 outline-none italic leading-relaxed" />
-                  <textarea value={scene.prompt} onChange={(e) => handleEditScene(idx, 'prompt', e.target.value)} className="w-full h-32 bg-amber-400/5 p-3 rounded-xl text-[10px] text-amber-100/70 outline-none border border-amber-400/10" />
-                </div>
-              ))}
-            </div>
-            <div className="text-center pt-10 sticky bottom-4 z-50">
-              <button onClick={() => setStep(AppStep.CREATION)} className="px-14 py-5 bg-amber-400 text-slate-950 font-bold rounded-full shadow-2xl hover:bg-amber-500 transition-all uppercase tracking-widest">
-                {t.confirmPlan}
-              </button>
-            </div>
-          </div>
-        )}
-
         {step === AppStep.CREATION && storyPlan && (
           <div className="space-y-8 animate-in slide-in-from-right duration-500">
-            <div className="flex overflow-x-auto gap-3 pb-6 no-scrollbar p-2">
-              {storyPlan.scenes.map((scene, idx) => (
-                <button key={idx} draggable onDragStart={() => onDragStart(idx)} onDragOver={(e) => onDragOver(e, idx)} onDrop={() => onDrop(idx)} onClick={() => setCurrentSceneIndex(idx)} className={`flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all border-2 ${currentSceneIndex === idx ? 'bg-amber-400 border-amber-400 text-slate-950 scale-110 shadow-lg' : scene.imageUrl ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
-                  {idx === 0 ? 'CVR' : idx === storyPlan.scenes.length - 1 ? 'END' : idx}
+            {/* Bulk Actions Toolbar */}
+            <div className="flex flex-col md:flex-row flex-wrap gap-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700/50 mb-8 items-center justify-between sticky top-4 z-40 shadow-2xl">
+              <div className="flex gap-4">
+                {isGeneratingScenes ? (
+                  <div className="flex gap-2">
+                    <button onClick={togglePause} className={`px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest text-slate-950 shadow-xl transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95 ${isPaused ? 'bg-green-500 hover:bg-green-400' : 'bg-amber-400 hover:bg-amber-500'}`}>
+                      <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'}`}></i>
+                      <span>{isPaused ? 'Resume' : 'Pause'}</span>
+                    </button>
+                    <button onClick={cancelGeneration} className="bg-red-500 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-600 shadow-xl shadow-red-500/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
+                      <i className="fas fa-stop"></i>
+                      <span>Stop</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={handleGenerateAll} className="bg-amber-400 text-slate-950 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-amber-500 shadow-xl shadow-amber-400/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
+                    <i className="fas fa-layer-group text-lg"></i>
+                    <span>Generate All Scenes</span>
+                  </button>
+                )}
+                <button onClick={handleAutoSplitAll} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
+                  <i className="fas fa-cut text-lg"></i>
+                  <span>Auto-Crop All</span>
                 </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="hidden lg:block text-slate-400 text-[10px] font-bold uppercase tracking-widest mr-2">
+                  {storyPlan.scenes.filter(s => s.status === 'done').length} / {storyPlan.scenes.length} Complets
+                </div>
+                <div className="h-8 w-px bg-slate-700 hidden lg:block"></div>
+                <button onClick={() => handleDownloadPDF('FULL')} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
+                  <i className="fas fa-file-pdf text-lg"></i>
+                  <span>Download PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grid of Scenes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+              {storyPlan.scenes.map((scene, idx) => (
+                <div key={idx} className={`relative bg-slate-900/50 rounded-3xl border ${scene.status === 'error' ? 'border-red-500/50' : scene.status === 'done' ? 'border-green-500/30' : 'border-slate-800'} overflow-hidden group hover:border-amber-400/50 transition-all shadow-lg flex flex-col`}>
+
+                  {/* Header */}
+                  <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${scene.status === 'done' ? 'bg-green-500/10 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                      Page {idx}
+                    </span>
+                    <span className="text-[9px] font-bold text-amber-500 uppercase truncate max-w-[120px]">{scene.type}</span>
+                  </div>
+
+                  {/* Image Area */}
+                  <div className="aspect-square bg-black relative overflow-hidden">
+                    {scene.splitImages ? (
+                      <div className="flex w-full h-full">
+                        <div className="w-1/2 h-full relative cursor-zoom-in border-r border-black/50" onClick={() => setFullscreenImage(scene.splitImages![0])}>
+                          <img src={scene.splitImages[0]} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                        </div>
+                        <div className="w-1/2 h-full relative cursor-zoom-in" onClick={() => setFullscreenImage(scene.splitImages![1])}>
+                          <img src={scene.splitImages[1]} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                        </div>
+                      </div>
+                    ) : scene.imageUrl ? (
+                      <img src={scene.imageUrl} className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-700" onClick={() => setFullscreenImage(scene.imageUrl!)} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-800">
+                        <i className="fas fa-image text-4xl mb-2 opacity-50"></i>
+                        <span className="text-[10px] uppercase font-bold text-slate-700">No Image</span>
+                      </div>
+                    )}
+
+                    {/* Loading Overlay */}
+                    {scene.status === 'loading' && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-20">
+                        <i className="fas fa-spinner animate-spin text-amber-400 text-3xl mb-2"></i>
+                        <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Generating...</span>
+                      </div>
+                    )}
+
+                    {/* Hover Actions */}
+                    <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 to-transparent flex gap-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                      <button onClick={() => handleGenerateScene(idx)} className="flex-1 bg-amber-400 text-slate-950 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-colors">
+                        {scene.imageUrl ? 'Regen' : 'Generate'}
+                      </button>
+                      {scene.imageUrl && (
+                        <button onClick={() => openSceneCrop(idx)} className="w-10 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-500 transition-colors flex items-center justify-center">
+                          <i className="fas fa-crop-alt"></i>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="p-4 space-y-3 flex-1 flex flex-col">
+                    {/* Aspect Ratio & Style */}
+                    <div className="flex gap-2">
+                      <button onClick={() => handleToggleAspectRatio(idx)} className="flex-1 bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-slate-700 border border-slate-700 transition-colors">
+                        {scene.aspectRatio} Layout
+                      </button>
+                    </div>
+
+                    {/* Prompt */}
+                    <div className="relative group/prompt flex-1">
+                      <textarea
+                        value={scene.prompt}
+                        onChange={(e) => handleEditScene(idx, 'prompt', e.target.value)}
+                        className="w-full h-full min-h-[80px] bg-slate-950/50 rounded-xl border border-slate-800 text-[10px] text-slate-400 p-3 focus:border-amber-400 outline-none resize-none transition-all scrollbar-thin"
+                        placeholder="Scene Description..."
+                      />
+                      <div className="absolute top-2 right-2 opacity-0 group-hover/prompt:opacity-100 transition-opacity">
+                        <i className="fas fa-pen text-[10px] text-slate-600"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* Bulk Actions Toolbar */}
-            <div className="flex flex-wrap gap-4 bg-slate-800/40 p-4 rounded-3xl border border-slate-700/50 mb-8 items-center justify-between">
-              <div className="flex gap-4">
-                <button onClick={handleGenerateAll} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 shadow-lg shadow-amber-400/20 transition-all flex items-center gap-2">
-                  <i className="fas fa-layer-group"></i> Generate All Scenes
-                </button>
-                <button onClick={handleAutoSplitAll} className="bg-blue-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
-                  <i className="fas fa-cut"></i> Auto-Crop All
-                </button>
-              </div>
-              <div className="flex gap-4">
-                <button onClick={() => handleDownloadPDF('LITE')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-600 border border-slate-600 flex items-center gap-2">
-                  <i className="fas fa-file-pdf"></i> PDF (16 Pages)
-                </button>
-                <button onClick={() => handleDownloadPDF('FULL')} className="bg-green-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 shadow-lg shadow-green-600/20 flex items-center gap-2">
-                  <i className="fas fa-file-pdf"></i> PDF (32 Pages)
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              <div className="lg:col-span-4 space-y-6">
-                <div className="bg-slate-800/60 p-7 rounded-3xl border border-slate-700 shadow-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <span className="text-[10px] uppercase font-black bg-amber-400 text-slate-950 px-2 py-1 rounded-lg">{t.page} {currentSceneIndex}</span>
-                    <h2 className="text-xl font-magic text-white leading-tight">{storyPlan.scenes[currentSceneIndex].title}</h2>
-                  </div>
-                  <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 mb-6 relative">
-                    <p className="italic text-sm text-amber-100/80 leading-relaxed">"{storyPlan.scenes[currentSceneIndex].storyText}"</p>
-                  </div>
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">{t.artStyle} Override</label>
-                      <div className="flex gap-2">
-                        {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.VECTOR_ART].map(s => (
-                          <button key={s} onClick={() => handleOverrideStyle(currentSceneIndex, s)} className={`flex-1 py-2 rounded-xl text-[9px] font-black border-2 ${(storyPlan.scenes[currentSceneIndex].overrideStyle || userInput.style) === s ? 'bg-amber-400 border-amber-400 text-slate-950' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{s.split(' ')[0]}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Art Engine Prompt</label>
-                      <textarea value={storyPlan.scenes[currentSceneIndex].prompt} onChange={(e) => handleEditScene(currentSceneIndex, 'prompt', e.target.value)} className="w-full h-32 bg-slate-950/70 p-4 rounded-2xl border border-slate-800 text-[11px] text-slate-400 outline-none" />
-                    </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">{t.editDetails}</label>
-                      <div className="flex gap-2">
-                        <textarea value={storyPlan.scenes[currentSceneIndex].editInstruction || ''} onChange={(e) => handleEditScene(currentSceneIndex, 'editInstruction', e.target.value)} className="flex-1 h-16 bg-blue-900/10 p-3 rounded-xl border border-blue-400/20 text-[11px] text-slate-300 outline-none" placeholder="e.g. Change outfits to blue..." />
-                        <button disabled={!storyPlan.scenes[currentSceneIndex].imageUrl || storyPlan.scenes[currentSceneIndex].status === 'loading'} onClick={() => handleEditPhoto(currentSceneIndex)} className="bg-blue-600 text-white px-4 rounded-xl hover:bg-blue-500 disabled:opacity-20"><i className="fas fa-wand-sparkles"></i></button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button disabled={storyPlan.scenes[currentSceneIndex].status === 'loading'} onClick={() => handleGenerateScene(currentSceneIndex)} className="bg-amber-400 text-slate-950 font-black py-4 rounded-2xl hover:bg-amber-500 uppercase text-xs tracking-widest">{storyPlan.scenes[currentSceneIndex].status === 'loading' ? <i className="fas fa-spinner animate-spin"></i> : t.regenerate}</button>
-                      <button disabled={!storyPlan.scenes[currentSceneIndex].imageUrl} onClick={() => handleAnalyze(currentSceneIndex)} className="bg-slate-700 text-white font-black py-4 rounded-2xl uppercase text-xs tracking-widest">{t.analyze}</button>
-                    </div>
-                    {storyPlan.scenes[currentSceneIndex].imageUrl && (
-                      <div className="flex gap-2">
-                        <button onClick={() => openSceneCrop(currentSceneIndex)} className="flex-1 bg-blue-500 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest">{t.cropSplit}</button>
-                        {storyPlan.scenes[currentSceneIndex].splitImages && <button onClick={() => handleUncrop(currentSceneIndex)} className="px-4 bg-slate-700 text-white font-black rounded-2xl"><i className="fas fa-undo"></i></button>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Portraits Persistence</h4>
-                  <div className="flex flex-wrap gap-3">
-                    <img src={userInput.photoBase64} className="w-14 h-14 rounded-xl object-cover border-2 border-amber-400" />
-                    {userInput.audience === TargetAudience.LOVERS && <img src={userInput.partnerPhotoBase64} className="w-14 h-14 rounded-xl object-cover border-2 border-pink-500" />}
-                    {userInput.extras.map(ex => <img key={ex.id} src={ex.photoBase64} className="w-14 h-14 rounded-xl object-cover border-2 border-slate-700 opacity-80" />)}
-                  </div>
-                </div>
-                <button onClick={handleDownloadPDF} disabled={loading} className="w-full bg-green-600 text-white font-black py-5 rounded-3xl hover:bg-green-500 uppercase tracking-widest text-sm shadow-xl shadow-green-600/20">{t.downloadPdf}</button>
-              </div>
-
-              <div className="lg:col-span-8 space-y-6">
-                <div className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-slate-950 border-8 border-slate-800/50 min-h-[550px] flex flex-col items-center justify-center ${storyPlan.scenes[currentSceneIndex].aspectRatio === '1:1' ? 'max-w-[600px] mx-auto' : 'w-full'}`}>
-                  {storyPlan.scenes[currentSceneIndex].splitImages ? (
-                    <div className="flex w-full h-full gap-1 p-1 bg-slate-900">
-                      <div className="flex-1 aspect-square relative group">
-                        <img src={storyPlan.scenes[currentSceneIndex].splitImages![0]} className="w-full h-full object-cover rounded-l-2xl cursor-zoom-in" onClick={() => setFullscreenImage(storyPlan.scenes[currentSceneIndex].splitImages![0])} />
-                      </div>
-                      <div className="flex-1 aspect-square relative group">
-                        <img src={storyPlan.scenes[currentSceneIndex].splitImages![1]} className="w-full h-full object-cover rounded-r-2xl cursor-zoom-in" onClick={() => setFullscreenImage(storyPlan.scenes[currentSceneIndex].splitImages![1])} />
-                      </div>
-                    </div>
-                  ) : storyPlan.scenes[currentSceneIndex].imageUrl ? (
-                    <div className="relative w-full h-full group">
-                      <img src={storyPlan.scenes[currentSceneIndex].imageUrl} className="w-full h-full object-cover cursor-zoom-in" onClick={() => setFullscreenImage(storyPlan.scenes[currentSceneIndex].imageUrl!)} />
-                    </div>
-                  ) : (
-                    <div className="text-center p-12 opacity-30">
-                      <i className="fas fa-paint-brush text-4xl mb-6"></i>
-                      <p className="text-lg font-bold">Ready to Illustrate</p>
-                    </div>
-                  )}
-                  {storyPlan.scenes[currentSceneIndex].status === 'loading' && (
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center p-10 z-20">
-                      <i className="fas fa-magic text-amber-400 text-7xl animate-pulse mb-4"></i>
-                      <p className="text-amber-400 font-magic text-2xl">{t.generatingArt}</p>
-                    </div>
-                  )}
-                </div>
-
-                {storyPlan.scenes[currentSceneIndex].history.length > 0 && (
-                  <div className="bg-slate-950/30 p-4 rounded-3xl border border-slate-800/50">
-                    <div className="flex items-center justify-between mb-3 px-2">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.versionHistory} ({storyPlan.scenes[currentSceneIndex].history.length} versions)</span>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar no-scrollbar-md">
-                      {storyPlan.scenes[currentSceneIndex].history.map((histUrl, hIdx) => (
-                        <div key={hIdx} className="relative group flex-shrink-0">
-                          <button
-                            onClick={() => restoreFromHistory(currentSceneIndex, histUrl)}
-                            className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-slate-800 hover:border-amber-400 transition-all block"
-                          >
-                            <img src={histUrl} className="w-full h-full object-cover" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center bg-slate-800/20 p-4 rounded-3xl border border-slate-800/50">
-                  <button disabled={currentSceneIndex === 0} onClick={() => setCurrentSceneIndex(p => p - 1)} className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center hover:bg-slate-700 disabled:opacity-20"><i className="fas fa-chevron-left"></i></button>
-                  <div className="flex gap-4">
-                    <button onClick={() => handleToggleAspectRatio(currentSceneIndex)} className="bg-slate-800 text-slate-300 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-700">{storyPlan.scenes[currentSceneIndex].aspectRatio} Layout</button>
-                  </div>
-                  <button disabled={currentSceneIndex === storyPlan.scenes.length - 1} onClick={() => setCurrentSceneIndex(p => p + 1)} className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center hover:bg-slate-700 disabled:opacity-20"><i className="fas fa-chevron-right"></i></button>
-                </div>
-              </div>
+            <div className="text-center pb-20">
+              <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-slate-500 hover:text-amber-400 transition-colors">
+                <i className="fas fa-arrow-up text-2xl animate-bounce"></i>
+              </button>
             </div>
           </div>
         )}

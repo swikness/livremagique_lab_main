@@ -6,9 +6,8 @@ const getFreshAI = () => {
   // Check localStorage first
   let customKey = typeof window !== 'undefined' ? localStorage.getItem('GEMINI_API_KEY') : null;
 
-  // Basic validation: must be string, not empty, not 'null', not 'undefined', and reasonable length (e.g. > 10 chars)
+  // Basic validation
   if (customKey && customKey.trim().length > 10 && customKey !== 'null' && customKey !== 'undefined') {
-    console.log(`Initializing Gemini Client with CUSTOM KEY from localStorage (Ends with: ${customKey.slice(-4)})`);
     return new GoogleGenerativeAI(customKey);
   }
 
@@ -16,20 +15,17 @@ const getFreshAI = () => {
   const envKey = import.meta.env.VITE_GEMINI_API_KEY;
 
   if (envKey && typeof envKey === 'string' && envKey.startsWith('AIza')) {
-    console.log("Initializing Gemini Client with ENV key (VITE_GEMINI_API_KEY)...");
     return new GoogleGenerativeAI(envKey);
   }
 
-  console.warn("No API Key found in LocalStorage or Environment Variables.");
-  // Fallback or Error - Ideally we throw here or return a dummy client that errors on use, 
-  // but for now let's let it fail naturally if called.
+  console.warn("No API Key found.");
   return new GoogleGenerativeAI("MISSING_API_KEY");
 };
 
 export const setCustomApiKey = (key: string) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('GEMINI_API_KEY', key);
-    window.location.reload(); // Reload to ensure services pick it up
+    window.location.reload();
   }
 };
 
@@ -45,9 +41,9 @@ const STYLE_DESCRIPTIONS = {
 
 export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> => {
   const genAI = getFreshAI();
-  // Using gemini-1.5-pro as it is the stable web-supported model that supports JSON schema well.
+  // UPGRADE: Using gemini-3-pro for superior reasoning
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-pro',
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -77,7 +73,6 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   });
 
   const themesStr = input.selectedThemes.join(', ');
-
   const char1Info = `${input.name} (Age: ${input.age}, Gender: ${input.gender})`;
   const char2Info = input.audience === TargetAudience.LOVERS ? ` and ${input.partnerName} (Age: ${input.partnerAge}, Gender: ${input.partnerGender})` : '';
   const mainCharacterContext = input.audience === TargetAudience.LOVERS
@@ -107,14 +102,16 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Determine a 'characterSide' ('LEFT' or 'RIGHT').
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
     - Generate a 'prompt' using this EXACT TEMPLATE:
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
-      COMPOSITION RULE: Create a wide, continuous scene. The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. [Further scene details].
+      COMPOSITION RULE: Create a wide, continuous scene. The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. 
+      CHARACTER CONSISTENCY RULE: The characters MUST be facing the camera/viewer. Do NOT show side profiles unless explicitly necessary for the action. 
+      [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. Keep the EXACT VERTICAL CENTER clear of characters, faces, or important focal points. 
       TEXT PLACEMENT: The text must be placed strictly on the opposite side of the characters (the [OPPOSITE_SIDE] side), avoiding the center.
       TYPOGRAPHY: Use clean, simple, highly legible, standard font for the story text. DO NOT use fancy effects.
@@ -124,7 +121,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     - Summary of the book (in ${input.language}).
     - Title of the book mentioned.
     - Prompt follows the Front Cover logic but is a "closing scene".
-
+    
     CRITICAL: All content within 'synopsis', 'title', 'storyText', and 'HEADLINE TEXT' must be written in ${input.language}.
     Return JSON format.
   `;
@@ -142,7 +139,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       ...s,
       history: [],
       status: 'idle',
-      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9'
+      // UPGRADE: 2:1 for scenes, 1:1 for covers
+      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '2:1'
     }))
   };
 };
@@ -163,6 +161,7 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
     {
       text: `${finalPrompt} 
       FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.
+      ORIENTATION RULE: Characters must be facing the FRONT/CAMERA as much as possible to ensure likeness visibility.
       CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
       TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.` }
   ];
@@ -187,10 +186,8 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
 
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
 
-  // Try to use the user's specific image model via the new SDK.
-  // Assuming 'gemini-3-pro-image-preview' accepts standard generateContent calls.
-  // If not, this might need adjustment, but this is the best path forward for browser compatibility.
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+  // UPGRADE: Using gemini-3-pro for images as requested
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
 
   try {
     const result = await model.generateContent({
@@ -246,7 +243,8 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
   }
 
   console.log("Editing Image...");
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+  // UPGRADE: Using gemini-3-pro
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
 
   const result = await model.generateContent({
     contents: [{ role: 'user', parts }]
@@ -269,7 +267,8 @@ export const analyzeImage = async (imageUrl: string, prompt: string): Promise<st
   const base64 = imageUrl.split(',')[1];
 
   console.log("Analyzing Image...");
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  // UPGRADE: Using gemini-3-pro
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
 
   const result = await model.generateContent([
     { inlineData: { mimeType: 'image/png', data: base64 } },
@@ -284,8 +283,9 @@ export const describeAsset = async (base64Photo: string, assetType: string): Pro
   const base64 = base64Photo.split(',')[1];
 
   console.log(`Describing Asset: ${assetType}`);
+  // UPGRADE: Using gemini-3-pro
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-pro',
     generationConfig: { responseMimeType: "application/json" }
   });
 
@@ -295,4 +295,35 @@ export const describeAsset = async (base64Photo: string, assetType: string): Pro
   ]);
 
   return JSON.parse(result.response.text() || '{"name": "", "description": ""}');
+};
+
+// NEW FUNCTION: Photo Analysis
+export const analyzePhotoQuality = async (base64Photo: string): Promise<{ score: number, feedback: string }> => {
+  const genAI = getFreshAI();
+  const base64 = base64Photo.split(',')[1];
+
+  console.log("Analyzing Photo Quality...");
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3-pro',
+    generationConfig: { responseMimeType: "application/json" }
+  });
+
+  const result = await model.generateContent([
+    { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+    `Analyze this face photo for AI image generation suitability. 
+    Criteria:
+    1. Sharpness/Focus (must be clear)
+    2. Lighting (must be balanced, no harsh shadows)
+    3. Orientation (must be FRONT facing, clearly visible eyes/nose/mouth)
+    4. Completeness (no cropping of major facial features)
+    
+    Return JSON: {"score": number (0-100), "feedback": "Short advice string"}`
+  ]);
+
+  try {
+    const raw = JSON.parse(result.response.text());
+    return { score: raw.score || 0, feedback: raw.feedback || "Could not analyze." };
+  } catch (e) {
+    return { score: 50, feedback: "Analysis error." };
+  }
 };
