@@ -94,6 +94,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     Target Language for ALL TEXT: ${input.language}
     Extras: ${input.extras.map(e => `${e.type}: ${e.name} (${e.description})`).join(', ')}
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
+    
+    CRITICAL CULTURAL RULE: This story is for a Moroccan audience. STRICTLY EXCLUDE any references to Christmas (Noël), Alcohol, Pork, Dating that violates traditional values, or any religious holidays not common in Morocco. Focus on universal themes of love, family, and respect.
 
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
@@ -105,7 +107,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top in large, bold, textured typography. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Determine a 'characterSide' ('LEFT' or 'RIGHT').
@@ -115,6 +117,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       COMPOSITION RULE: Create a wide, continuous scene. The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. Keep the EXACT VERTICAL CENTER clear of characters, faces, or important focal points. 
       TEXT PLACEMENT: The text must be placed strictly on the opposite side of the characters (the [OPPOSITE_SIDE] side), avoiding the center.
+      TYPOGRAPHY: Use clean, simple, highly legible, standard font for the story text. DO NOT use fancy effects.
       TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX 16 (BACK COVER):
