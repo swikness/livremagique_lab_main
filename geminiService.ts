@@ -90,7 +90,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     Target Language for ALL TEXT: ${input.language}
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
     
-    CULTURAL CONTEXT: This story is for a Moroccan audience. Keep the tone respectful and family-friendly. Use Moroccan names and settings naturally where appropriate, but focus primarily on the story concept provided.
+    CULTURAL CONTEXT: This story is for a Moroccan audience. The setting should reflect a vibrant blend of MODERN and TRADITIONAL Moroccan elements. Avoid purely ancient or rural stereotypes. Mix contemporary lifestyles (modern clothing, cities, technology) with traditional architecture and touches where appropriate. Keep the tone respectful and family-friendly.
     
     STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
 
@@ -104,7 +104,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CRITICAL LAYOUT RULE: LEAVE SIGNIFICANT EMPTY NEGATIVE SPACE AT THE VERY TOP (25%) AND VERY BOTTOM (25%) OF THE IMAGE. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top in the empty space. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Determine a 'characterSide' ('LEFT' or 'RIGHT').
@@ -189,7 +189,12 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
 
   // UPGRADE: Using gemini-3-pro for images as requested
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3-pro-image-preview',
+    generationConfig: {
+      aspectRatio: scene.aspectRatio === '1:1' ? '1:1' : '16:9'
+    } as any
+  });
 
   try {
     const result = await model.generateContent({

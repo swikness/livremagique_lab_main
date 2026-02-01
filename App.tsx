@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Cropper from 'react-easy-crop';
 import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
+
+const LOGO_PATH = '/logo.png';
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality } from './geminiService';
 import { ApiKeyInput } from './ApiKeyInput';
 
@@ -278,6 +280,8 @@ const App: React.FC = () => {
   const [cropTarget, setCropTarget] = useState<'reference' | 'partner' | 'scene'>('reference');
   const [sceneToCropIndex, setSceneToCropIndex] = useState<number | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [selectedScenes, setSelectedScenes] = useState<Set<number>>(new Set());
+  const [showPrompts, setShowPrompts] = useState<Record<number, boolean>>({});
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
@@ -433,6 +437,42 @@ const App: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadImageWithLogo = async (url: string, filename: string, addLogo: boolean = false) => {
+    if (!addLogo) {
+      downloadImage(url, filename);
+      return;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const img = await createImage(url);
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // Add Logo
+      try {
+        const logoImg = await createImage(LOGO_PATH);
+        // Center bottom, ~20% width of the cover
+        const logoWidth = canvas.width * 0.2;
+        const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+        const x = (canvas.width - logoWidth) / 2;
+        const y = canvas.height - logoHeight - (canvas.height * 0.05); // 5% padding from bottom
+        ctx.drawImage(logoImg, x, y, logoWidth, logoHeight);
+      } catch (e) {
+        console.warn("Logo not found or failed to load", e);
+      }
+
+      const dataUrl = canvas.toDataURL('image/png');
+      downloadImage(dataUrl, filename);
+    } catch (e) {
+      console.error("Failed to compose image with logo", e);
+      downloadImage(url, filename); // Fallback
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'reference' | 'partner' = 'reference') => {
@@ -795,6 +835,52 @@ const App: React.FC = () => {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
+  const handleToggleSelect = (index: number) => {
+    setSelectedScenes(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (!storyPlan) return;
+    if (selectedScenes.size === storyPlan.scenes.length) {
+      setSelectedScenes(new Set());
+    } else {
+      setSelectedScenes(new Set(storyPlan.scenes.map((_, i) => i)));
+    }
+  };
+
+  const handleDownloadSelected = async () => {
+    if (!storyPlan) return;
+    for (const index of selectedScenes) {
+      const scene = storyPlan.scenes[index];
+      if (scene.imageUrl) {
+        // If it's cover (0 or 16), use logo
+        const addLogo = (index === 0 || index === 16);
+        await downloadImageWithLogo(scene.imageUrl, `${userInput.name}-Scene-${index}.png`, addLogo);
+        // Stagger downloads slightly
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+  };
+
+  const handleRegenerateSelected = async () => {
+    if (!storyPlan) return;
+    for (const index of selectedScenes) {
+      // Mark as loading/reset? handleGenerateScene handles state update
+      await handleGenerateScene(index);
+      // Stagger slightly
+      await new Promise(r => setTimeout(r, 500));
+    }
+  };
+
+  const handleTogglePrompt = (index: number) => {
+    setShowPrompts(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
   const handleDownloadPDF = async (mode: 'FULL' | 'LITE' = 'FULL') => {
     if (!storyPlan) return;
     const doc = new jsPDF({
@@ -805,10 +891,29 @@ const App: React.FC = () => {
     const isRTL = userInput.language === 'Arabic';
     setLoading(true);
     try {
-      // Index 0: Cover
-      if (storyPlan.scenes[0].imageUrl) doc.addImage(storyPlan.scenes[0].imageUrl, 'PNG', 0, 0, 1024, 1024);
+      // Index 0: Cover with Logo
+      if (storyPlan.scenes[0].imageUrl) {
+        // Create canvas to add logo for PDF
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = await createImage(storyPlan.scenes[0].imageUrl);
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
 
-      // Scenes 1-15 (Strict 32 Pages total: Front + 15*2 + Back = 32 Pages? Wait. 1+30+1 = 32. Correct.)
+        try {
+          const logoImg = await createImage(LOGO_PATH);
+          const logoWidth = canvas.width * 0.2;
+          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+          const x = (canvas.width - logoWidth) / 2;
+          const y = canvas.height - logoHeight - (canvas.height * 0.05);
+          ctx?.drawImage(logoImg, x, y, logoWidth, logoHeight);
+        } catch (e) { console.warn("PDF Logo Error", e); }
+
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 1024, 1024);
+      }
+
+      // Scenes 1-15 
       for (let i = 1; i <= 15; i++) {
         const scene = storyPlan.scenes[i];
         let left, right;
@@ -840,9 +945,27 @@ const App: React.FC = () => {
         }
       }
 
-      // Index 16: Back Cover
+      // Index 16: Back Cover with Logo
       doc.addPage([1024, 1024]);
-      if (storyPlan.scenes[16].imageUrl) doc.addImage(storyPlan.scenes[16].imageUrl, 'PNG', 0, 0, 1024, 1024);
+      doc.addPage([1024, 1024]);
+      if (storyPlan.scenes[16].imageUrl) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = await createImage(storyPlan.scenes[16].imageUrl);
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        try {
+          const logoImg = await createImage(LOGO_PATH);
+          const logoWidth = canvas.width * 0.2;
+          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+          const x = (canvas.width - logoWidth) / 2;
+          const y = canvas.height - logoHeight - (canvas.height * 0.05);
+          ctx?.drawImage(logoImg, x, y, logoWidth, logoHeight);
+        } catch (e) { console.warn("PDF Logo Error", e); }
+
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 1024, 1024);
+      }
 
       doc.save(`${userInput.name}-Magical-Book.pdf`);
     } catch (err) {
@@ -1243,7 +1366,25 @@ const App: React.FC = () => {
           <div className="space-y-8 animate-in slide-in-from-right duration-500">
             {/* Bulk Actions Toolbar */}
             <div className="flex flex-col md:flex-row flex-wrap gap-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700/50 mb-8 items-center justify-between sticky top-4 z-40 shadow-2xl">
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
+                {/* Bulk Select Control */}
+                <button onClick={handleSelectAll} className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all ${selectedScenes.size === storyPlan.scenes.length && storyPlan.scenes.length > 0 ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-600 text-slate-400'}`}>
+                  <i className="fas fa-check-double"></i>
+                </button>
+
+                {selectedScenes.size > 0 && (
+                  <div className="flex gap-2 animate-in slide-in-from-left">
+                    <button onClick={handleDownloadSelected} className="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase hover:bg-slate-600 transition-colors">
+                      <i className="fas fa-download mr-2"></i> ({selectedScenes.size})
+                    </button>
+                    <button onClick={handleRegenerateSelected} className="bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase hover:bg-slate-600 transition-colors">
+                      <i className="fas fa-sync mr-2"></i> ({selectedScenes.size})
+                    </button>
+                  </div>
+                )}
+
+                <div className="h-8 w-px bg-slate-700 mx-2 hidden md:block"></div>
+
                 {isGeneratingScenes ? (
                   <div className="flex gap-2">
                     <button onClick={togglePause} className={`px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest text-slate-950 shadow-xl transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95 ${isPaused ? 'bg-green-500 hover:bg-green-400' : 'bg-amber-400 hover:bg-amber-500'}`}>
@@ -1286,9 +1427,14 @@ const App: React.FC = () => {
 
                   {/* Header */}
                   <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${scene.status === 'done' ? 'bg-green-500/10 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
-                      Page {idx}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => handleToggleSelect(idx)} className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedScenes.has(idx) ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-600 hover:border-slate-400'}`}>
+                        {selectedScenes.has(idx) && <i className="fas fa-check text-[10px]"></i>}
+                      </button>
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${scene.status === 'done' ? 'bg-green-500/10 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                        Page {idx}
+                      </span>
+                    </div>
                     <span className="text-[9px] font-bold text-amber-500 uppercase truncate max-w-[120px]">{scene.type}</span>
                   </div>
 
@@ -1336,24 +1482,37 @@ const App: React.FC = () => {
                   {/* Content Area */}
                   <div className="p-4 space-y-3 flex-1 flex flex-col">
                     {/* Aspect Ratio & Style */}
-                    <div className="flex gap-2">
-                      <span className="flex-1 bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
+                    <div className="flex gap-2 justify-between">
+                      <span className="bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
                         {scene.aspectRatio}
                       </span>
+                      {/* Toggle Prompt Button */}
+                      <button onClick={() => handleTogglePrompt(idx)} className="text-slate-500 hover:text-amber-400 transition-colors text-xs" title="Show/Hide Prompt">
+                        <i className={`fas ${showPrompts[idx] ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
                     </div>
 
                     {/* Prompt */}
-                    <div className="relative group/prompt flex-1">
-                      <textarea
-                        value={scene.prompt}
-                        onChange={(e) => handleEditScene(idx, 'prompt', e.target.value)}
-                        className="w-full h-full min-h-[80px] bg-slate-950/50 rounded-xl border border-slate-800 text-[10px] text-slate-400 p-3 focus:border-amber-400 outline-none resize-none transition-all scrollbar-thin"
-                        placeholder="Scene Description..."
-                      />
-                      <div className="absolute top-2 right-2 opacity-0 group-hover/prompt:opacity-100 transition-opacity">
-                        <i className="fas fa-pen text-[10px] text-slate-600"></i>
+                    {showPrompts[idx] && (
+                      <div className="relative group/prompt flex-1 animate-in fade-in slide-in-from-top-2">
+                        <textarea
+                          value={scene.prompt}
+                          onChange={(e) => handleEditScene(idx, 'prompt', e.target.value)}
+                          className="w-full h-full min-h-[80px] bg-slate-950/50 rounded-xl border border-slate-800 text-[10px] text-slate-400 p-3 focus:border-amber-400 outline-none resize-none transition-all scrollbar-thin"
+                          placeholder="Scene Description..."
+                        />
+                        <div className="absolute top-2 right-2 opacity-0 group-hover/prompt:opacity-100 transition-opacity">
+                          <i className="fas fa-pen text-[10px] text-slate-600"></i>
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Download Button for individual card */}
+                    {scene.imageUrl && (
+                      <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, (idx === 0 || idx === 16))} className="w-full py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                        <i className="fas fa-download"></i> Download
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
