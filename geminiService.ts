@@ -189,16 +189,15 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
 
   // UPGRADE: Using gemini-3-pro for images as requested
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro-image-preview',
-    generationConfig: {
-      aspectRatio: scene.aspectRatio === '1:1' ? '1:1' : '16:9'
-    } as any
-  });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+
+  // Append Aspect Ratio to the prompt manually since it's an experimental model
+  const aspectRatioIntruction = scene.aspectRatio === '1:1' ? 'Aspect Ratio: 1:1 Square' : 'Aspect Ratio: 16:9 Wide';
+  const finalPromptWithRatio = `${activeStyle}. ${aspectRatioIntruction}. ${finalPrompt}`;
 
   try {
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts }]
+      contents: [{ role: 'user', parts: [{ text: finalPromptWithRatio }, ...parts.slice(1)] }]
     });
 
     const candidates = result.response.candidates;

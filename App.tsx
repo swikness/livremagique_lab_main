@@ -6,7 +6,7 @@ import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, Extra
 
 const LOGO_PATH = '/logo.png';
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality } from './geminiService';
-import { ApiKeyInput } from './ApiKeyInput';
+
 
 const THEME_OPTIONS = [
   "Amour", "Amitié", "Courage", "Environnement", "Mystère",
@@ -742,7 +742,7 @@ const App: React.FC = () => {
     } catch (err: any) {
       scene.status = 'error';
       console.error(err);
-      setErrorMessage(`Generation failed. Ensure a paid API key is selected.`);
+      setErrorMessage(`Generation failed: ${err.message || 'Unknown error'}`);
     } finally {
       setStoryPlan({ ...storyPlan, scenes: newScenes });
     }
@@ -1002,7 +1002,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
-      <ApiKeyInput />
+
       {fullscreenImage && (
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4" onClick={() => setFullscreenImage(null)}>
           <img src={fullscreenImage} className="max-w-full max-h-full object-contain cursor-pointer shadow-2xl" />
