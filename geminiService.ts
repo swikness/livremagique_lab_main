@@ -87,12 +87,12 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     Themes to include: ${themesStr}
     Visual Style: ${input.style}
     Target Language for ALL TEXT: ${input.language}
-    Extras: ${input.extras.map(e => `${e.type}: ${e.name} (${e.description})`).join(', ')}
+    Target Language for ALL TEXT: ${input.language}
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
     
-    CRITICAL CULTURAL RULE: This story is for a Moroccan audience. STRICTLY EXCLUDE any references to Christmas (Noël), Alcohol, Pork, Dating that violates traditional values, or any religious holidays not common in Morocco. Focus on universal themes of love, family, and respect.
+    CULTURAL CONTEXT: This story is for a Moroccan audience. Keep the tone respectful and family-friendly. Use Moroccan names and settings naturally where appropriate, but focus primarily on the story concept provided.
     
-    STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s)${input.extras.length > 0 ? " and the specifically defined Extras" : ""}. Do NOT invent any new supporting characters, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept'. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment.
+    STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
 
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
@@ -141,8 +141,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       ...s,
       history: [],
       status: 'idle',
-      // UPGRADE: 2:1 for scenes, 1:1 for covers
-      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '1.7:1'
+      // UPGRADE: 16:9 for scenes, 1:1 for covers
+      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9'
     }))
   };
 };

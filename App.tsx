@@ -675,7 +675,7 @@ const App: React.FC = () => {
           // But we must set aspect ratio to 2:1 to match UI state.
           const [left, right] = await splitImage(scene.imageUrl);
           scene.splitImages = [left, right];
-          scene.aspectRatio = '2:1';
+          scene.aspectRatio = '1.7:1';
           changed = true;
         } catch (e) {
           console.error("Failed to auto split", e);
@@ -761,7 +761,7 @@ const App: React.FC = () => {
     const newScenes = [...storyPlan.scenes];
     const current = newScenes[index].aspectRatio;
     if (current === '1:1') newScenes[index].aspectRatio = '16:9';
-    else if (current === '16:9') newScenes[index].aspectRatio = '2:1';
+    else if (current === '16:9') newScenes[index].aspectRatio = '1.7:1';
     else newScenes[index].aspectRatio = '1:1';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
   };
@@ -808,29 +808,35 @@ const App: React.FC = () => {
       // Index 0: Cover
       if (storyPlan.scenes[0].imageUrl) doc.addImage(storyPlan.scenes[0].imageUrl, 'PNG', 0, 0, 1024, 1024);
 
+      // Scenes 1-15 (Strict 32 Pages total: Front + 15*2 + Back = 32 Pages? Wait. 1+30+1 = 32. Correct.)
       for (let i = 1; i <= 15; i++) {
         const scene = storyPlan.scenes[i];
+        let left, right;
 
-        if (mode === 'LITE') {
-          // Lite Mode: Just add the single image (whether split or not, we take the main imageUrl or combined)
-          // We prefer the scene.imageUrl if splitImages is not the definitive source, but splitImages are better if they exist.
-          doc.addPage([1024, 1024]);
-          if (scene.imageUrl) doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 1024);
-        } else {
-          // Full Mode: 32 Pages (Split)
-          if (scene.splitImages) {
-            const [left, right] = scene.splitImages;
-            doc.addPage([1024, 1024]);
-            doc.addImage(isRTL ? right : left, 'PNG', 0, 0, 1024, 1024);
-            doc.addPage([1024, 1024]);
-            doc.addImage(isRTL ? left : right, 'PNG', 0, 0, 1024, 1024);
-          } else {
-            // Fallback if not split: Add same image or placeholders?
-            // Existing logic added page then image.
-            doc.addPage([1024, 1024]);
-            if (scene.imageUrl) doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 1024);
-            doc.addPage([1024, 1024]);
+        if (scene.splitImages) {
+          [left, right] = scene.splitImages;
+        } else if (scene.imageUrl) {
+          // Auto-split if not already split
+          try {
+            const [l, r] = await splitImage(scene.imageUrl);
+            left = l;
+            right = r;
+          } catch (e) {
+            console.error("Auto-split failed for PDF", e);
+            left = scene.imageUrl; // Fallback
+            right = scene.imageUrl;
           }
+        }
+
+        if (left && right) {
+          doc.addPage([1024, 1024]);
+          doc.addImage(isRTL ? right : left, 'PNG', 0, 0, 1024, 1024);
+          doc.addPage([1024, 1024]);
+          doc.addImage(isRTL ? left : right, 'PNG', 0, 0, 1024, 1024);
+        } else {
+          // Fallback blank pages if no image
+          doc.addPage([1024, 1024]);
+          doc.addPage([1024, 1024]);
         }
       }
 
@@ -838,7 +844,7 @@ const App: React.FC = () => {
       doc.addPage([1024, 1024]);
       if (storyPlan.scenes[16].imageUrl) doc.addImage(storyPlan.scenes[16].imageUrl, 'PNG', 0, 0, 1024, 1024);
 
-      doc.save(`${userInput.name}-Magical-Book-${mode}.pdf`);
+      doc.save(`${userInput.name}-Magical-Book.pdf`);
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to generate PDF.");
@@ -907,7 +913,7 @@ const App: React.FC = () => {
                 image={imageToCrop}
                 crop={crop}
                 zoom={zoom}
-                aspect={cropTarget === 'scene' ? 2 : 1}
+                aspect={cropTarget === 'scene' ? 1.7 : 1}
                 onCropChange={setCrop}
                 onCropComplete={onCropComplete}
                 onZoomChange={setZoom}
@@ -946,7 +952,7 @@ const App: React.FC = () => {
           ))}
         </div>
 
-        {step === AppStep.INPUT && (
+        {(step === AppStep.INPUT || step === AppStep.CREATION) && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
@@ -1225,31 +1231,9 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-8 border-t border-slate-800">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-amber-100 flex items-center gap-2"><i className="fas fa-users-viewfinder text-amber-400"></i> Extra World Assets</h3>
-                <button onClick={addExtra} className="bg-amber-400/10 text-amber-400 border border-amber-400/30 px-5 py-2 rounded-full font-bold text-xs hover:bg-amber-400/20 transition-all">{t.addAssets}</button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {userInput.extras.map(ex => (
-                  <div key={ex.id} className="bg-slate-800/30 p-4 rounded-2xl border border-slate-700 flex gap-4 relative group hover:border-slate-500 transition-all">
-                    <button onClick={() => removeExtra(ex.id)} className="absolute top-2 right-2 text-slate-600 hover:text-red-400"><i className="fas fa-times-circle"></i></button>
-                    <div className="w-16 h-16 bg-slate-900 rounded-xl relative overflow-hidden flex-shrink-0 border border-slate-700">
-                      {ex.photoBase64 ? <img src={ex.photoBase64} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center justify-center h-full opacity-30"><i className="fas fa-image text-xs"></i></div>}
-                      <input type="file" accept="image/*" onChange={(e) => handleExtraUpload(e, ex.id)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <input value={ex.name} onChange={(e) => updateExtra(ex.id, 'name', e.target.value)} placeholder={t.name} className="w-full text-xs font-bold bg-transparent border-b border-slate-700 outline-none pb-1" />
-                      <input value={ex.description} onChange={(e) => updateExtra(ex.id, 'description', e.target.value)} placeholder="Desc" className="w-full text-[9px] text-slate-500 bg-transparent outline-none" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className="text-center pt-10">
               <button disabled={loading} onClick={handleGeneratePlan} className="group px-16 py-5 bg-amber-400 text-slate-950 font-bold rounded-full hover:bg-amber-500 transition-all shadow-xl shadow-amber-400/20 text-lg uppercase tracking-widest flex items-center gap-4 mx-auto disabled:opacity-50">
-                {loading ? <i className="fas fa-spinner animate-spin"></i> : <><i className="fas fa-magic"></i> {t.generateSynopsis}</>}
+                {loading ? <i className="fas fa-spinner animate-spin"></i> : storyPlan ? <><i className="fas fa-sync"></i> Update Changes</> : <><i className="fas fa-magic"></i> {t.generateSynopsis}</>}
               </button>
             </div>
           </div>
@@ -1353,9 +1337,9 @@ const App: React.FC = () => {
                   <div className="p-4 space-y-3 flex-1 flex flex-col">
                     {/* Aspect Ratio & Style */}
                     <div className="flex gap-2">
-                      <button onClick={() => handleToggleAspectRatio(idx)} className="flex-1 bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-slate-700 border border-slate-700 transition-colors">
-                        {scene.aspectRatio} Layout
-                      </button>
+                      <span className="flex-1 bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
+                        {scene.aspectRatio}
+                      </span>
                     </div>
 
                     {/* Prompt */}
