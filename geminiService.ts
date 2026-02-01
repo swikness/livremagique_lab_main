@@ -43,7 +43,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   const genAI = getFreshAI();
   // UPGRADE: Using gemini-3-pro for superior reasoning
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro',
+    model: 'gemini-3-pro-preview',
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -187,7 +187,7 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
 
   // UPGRADE: Using gemini-3-pro for images as requested
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
 
   try {
     const result = await model.generateContent({
@@ -244,7 +244,7 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
 
   console.log("Editing Image...");
   // UPGRADE: Using gemini-3-pro
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
 
   const result = await model.generateContent({
     contents: [{ role: 'user', parts }]
@@ -268,7 +268,7 @@ export const analyzeImage = async (imageUrl: string, prompt: string): Promise<st
 
   console.log("Analyzing Image...");
   // UPGRADE: Using gemini-3-pro
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
   const result = await model.generateContent([
     { inlineData: { mimeType: 'image/png', data: base64 } },
@@ -285,7 +285,7 @@ export const describeAsset = async (base64Photo: string, assetType: string): Pro
   console.log(`Describing Asset: ${assetType}`);
   // UPGRADE: Using gemini-3-pro
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro',
+    model: 'gemini-3-pro-preview',
     generationConfig: { responseMimeType: "application/json" }
   });
 
@@ -304,7 +304,7 @@ export const analyzePhotoQuality = async (base64Photo: string): Promise<{ score:
 
   console.log("Analyzing Photo Quality...");
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro',
+    model: 'gemini-3-pro-preview',
     generationConfig: { responseMimeType: "application/json" }
   });
 
