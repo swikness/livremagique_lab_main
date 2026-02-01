@@ -91,6 +91,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
     
     CRITICAL CULTURAL RULE: This story is for a Moroccan audience. STRICTLY EXCLUDE any references to Christmas (Noël), Alcohol, Pork, Dating that violates traditional values, or any religious holidays not common in Morocco. Focus on universal themes of love, family, and respect.
+    
+    STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s)${input.extras.length > 0 ? " and the specifically defined Extras" : ""}. Do NOT invent any new supporting characters, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept'. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment.
 
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
@@ -140,7 +142,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       history: [],
       status: 'idle',
       // UPGRADE: 2:1 for scenes, 1:1 for covers
-      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '2:1'
+      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '1.7:1'
     }))
   };
 };
