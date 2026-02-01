@@ -284,6 +284,23 @@ const App: React.FC = () => {
   const [showPrompts, setShowPrompts] = useState<Record<number, boolean>>({});
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  // Load Logo
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const response = await fetch(LOGO_PATH);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoBase64(reader.result as string);
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        console.warn("Could not load logo for AI", e);
+      }
+    };
+    loadLogo();
+  }, []);
 
   // New state for Photo Quality and Control
   const [photoQuality, setPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
@@ -642,7 +659,8 @@ const App: React.FC = () => {
       if (scene.status === 'done') continue;
 
       try {
-        const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64);
+        const isCover = i === 0 || i === 16;
+        const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
         scene.imageUrl = img;
         scene.status = 'done';
 
@@ -736,7 +754,8 @@ const App: React.FC = () => {
     scene.status = 'loading';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
-      const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64);
+      const isCover = index === 0 || index === 16;
+      const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
       scene.imageUrl = img;
       scene.status = 'done';
     } catch (err: any) {

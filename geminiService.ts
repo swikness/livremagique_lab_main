@@ -104,17 +104,18 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. CRITICAL LAYOUT RULE: LEAVE SIGNIFICANT EMPTY NEGATIVE SPACE AT THE VERY TOP (25%) AND VERY BOTTOM (25%) OF THE IMAGE. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. SETTING & ATMOSPHERE: [Describe the background]. TEXT ELEMENT: The headline must be placed prominently at the top in the empty space. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Determine a 'characterSide' ('LEFT' or 'RIGHT').
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
     - Generate a 'prompt' using this EXACT TEMPLATE:
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
-      COMPOSITION RULE: Create a wide, continuous scene. The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. 
+      COMPOSITION RULE: Create a wide, continuous scene (Aspect Ratio 2:1). The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. 
+      CENTER FOLD SAFETY: This image will be a double-page book spread. Keep the EXACT VERTICAL CENTER (the middle 10%) free of important details like faces or text, as it will be the book fold.
       CHARACTER CONSISTENCY RULE: The characters MUST be facing the camera/viewer. Do NOT show side profiles unless explicitly necessary for the action. 
       [Further scene details].
-      LAYOUT: Maintain a seamless continuous background across the entire width. Keep the EXACT VERTICAL CENTER clear of characters, faces, or important focal points. 
+      LAYOUT: Maintain a seamless continuous background across the entire width. 
       TEXT PLACEMENT: The text must be placed strictly on the opposite side of the characters (the [OPPOSITE_SIDE] side), avoiding the center.
       TYPOGRAPHY: Use clean, simple, highly legible, standard font for the story text. DO NOT use fancy effects.
       TEXT: [STORY_TEXT]"
@@ -147,7 +148,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   };
 };
 
-export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string): Promise<string> => {
+export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string, logoBase64?: string): Promise<string> => {
   const genAI = getFreshAI();
   const activeStyle = scene.overrideStyle || baseStyle;
   const styleKeywords = STYLE_DESCRIPTIONS[activeStyle];
@@ -177,13 +178,16 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
     });
   }
 
-  if (partnerPhoto) {
+
+
+  if (logoBase64) {
     parts.push({
       inlineData: {
-        mimeType: 'image/jpeg',
-        data: partnerPhoto.split(',')[1]
+        mimeType: 'image/png',
+        data: logoBase64.split(',')[1]
       }
     });
+    parts[0].text += " LOGO INSTRUCTION: Place the provided LOGO image at the bottom center of the book cover. It should be clearly visible and integrated naturally.";
   }
 
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
@@ -239,14 +243,7 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
     });
   }
 
-  if (partnerPhoto) {
-    parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: partnerPhoto.split(',')[1]
-      }
-    });
-  }
+
 
   console.log("Editing Image...");
   // UPGRADE: Using gemini-3-pro
