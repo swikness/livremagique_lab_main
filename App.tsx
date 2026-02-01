@@ -711,18 +711,17 @@ const App: React.FC = () => {
           }
 
           // 2. Auto-Crop to 2:1
-          // Covers are 1:1 (Square), Scenes are 2:1 (Two Squares)
-          // If user wants square pages, the spread is 2:1.
-          // However, covers are usually single pages (1:1).
-          const targetRatio = isCover ? 1 : 2;
-          const croppedImage = await autoCropToRatio(rawImage, targetRatio);
+          // Covers are excluded from auto-cropping as per user request.
+          // Scenes are cropped to 2:1 (Two Squares)
+          let croppedImage = rawImage;
 
           if (isCover) {
-            // No validation needed for cover yet (per user request "no need for cropping on front and back cover") regarding ratio, 
-            // but we still cropped it to 1:1 to be safe.
-            finalImage = croppedImage;
+            finalImage = rawImage;
             break;
           }
+
+          // Only crop scenes
+          croppedImage = await autoCropToRatio(rawImage, 2);
 
           // 3. Validate
           const validation = await validateBookSpread(croppedImage);
