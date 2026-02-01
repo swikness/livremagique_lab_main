@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
 
 const LOGO_PATH = '/logo.png';
-import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality } from './geminiService';
+import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread } from './geminiService';
 
 
 const THEME_OPTIONS = [
@@ -423,6 +423,36 @@ const App: React.FC = () => {
     return canvas.toDataURL('image/jpeg');
   };
 
+  const autoCropToRatio = async (imageSrc: string, targetRatio: number = 2): Promise<string> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imageSrc;
+
+    const sourceRatio = image.width / image.height;
+
+    let drawWidth = image.width;
+    let drawHeight = image.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (sourceRatio > targetRatio) {
+      // Source is wider than target: Crop width (sides)
+      drawWidth = image.height * targetRatio;
+      offsetX = (image.width - drawWidth) / 2;
+    } else {
+      // Source is taller than target: Crop height (top/bottom)
+      drawHeight = image.width / targetRatio;
+      offsetY = (image.height - drawHeight) / 2;
+    }
+
+    canvas.width = drawWidth;
+    canvas.height = drawHeight;
+
+    ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight, 0, 0, drawWidth, drawHeight);
+    return canvas.toDataURL('image/jpeg', 0.95);
+  };
+
   const splitImage = async (imageSrc: string): Promise<[string, string]> => {
     const image = await createImage(imageSrc);
     const canvas = document.createElement('canvas');
@@ -660,8 +690,59 @@ const App: React.FC = () => {
 
       try {
         const isCover = i === 0 || i === 16;
-        const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-        scene.imageUrl = img;
+
+        let attempts = 0;
+        let finalImage = "";
+        let currentPromptInstruction = ""; // Additional instruction for retries
+
+        while (attempts < 3) {
+          console.log(`Generation Attempt ${attempts + 1} for Scene ${i}`);
+
+          // 1. Generate (or Edit if retry)
+          let rawImage;
+          if (attempts === 0) {
+            rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+          } else {
+            // On retry, use editSceneImage to fix the specific issue
+            // We pass the PREVIOUS image to fix it, or we could regenerate from scratch. 
+            // Regenerating from scratch with instruction is often cleaner for "bad composition".
+            scene.prompt += ` IMPROVEMENT INSTRUCTION: ${currentPromptInstruction}`;
+            rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+          }
+
+          // 2. Auto-Crop to 2:1
+          // Covers are 1:1 (Square), Scenes are 2:1 (Two Squares)
+          // If user wants square pages, the spread is 2:1.
+          // However, covers are usually single pages (1:1).
+          const targetRatio = isCover ? 1 : 2;
+          const croppedImage = await autoCropToRatio(rawImage, targetRatio);
+
+          if (isCover) {
+            // No validation needed for cover yet (per user request "no need for cropping on front and back cover") regarding ratio, 
+            // but we still cropped it to 1:1 to be safe.
+            finalImage = croppedImage;
+            break;
+          }
+
+          // 3. Validate
+          const validation = await validateBookSpread(croppedImage);
+          console.log(`Validation result for Scene ${i}:`, validation);
+
+          if (validation.isValid) {
+            finalImage = croppedImage;
+            setPhotoQuality({ score: 95, feedback: "Perfectly composed spread." });
+            break;
+          } else {
+            console.warn(`Scene ${i} rejected: ${validation.reason}`);
+            setPhotoQuality({ score: 40, feedback: `Adjusting: ${validation.reason}` });
+            currentPromptInstruction = validation.retryInstruction || "Fix composition";
+            attempts++;
+          }
+        }
+
+        if (!finalImage) throw new Error("Failed to generate valid scene after retries.");
+
+        scene.imageUrl = finalImage;
         scene.status = 'done';
 
         // Update state to show progress
@@ -755,8 +836,44 @@ const App: React.FC = () => {
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
       const isCover = index === 0 || index === 16;
-      const img = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-      scene.imageUrl = img;
+
+      let attempts = 0;
+      let finalImage = "";
+      let currentPromptInstruction = "";
+
+      while (attempts < 3) {
+        let rawImage;
+        if (attempts === 0) {
+          rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+        } else {
+          scene.prompt += ` IMPROVEMENT INSTRUCTION: ${currentPromptInstruction}`;
+          rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+        }
+
+        const targetRatio = isCover ? 1 : 2;
+        const croppedImage = await autoCropToRatio(rawImage, targetRatio);
+
+        if (isCover) {
+          finalImage = croppedImage;
+          break;
+        }
+
+        const validation = await validateBookSpread(croppedImage);
+
+        if (validation.isValid) {
+          finalImage = croppedImage;
+          setPhotoQuality({ score: 95, feedback: "Perfectly composed spread." });
+          break;
+        } else {
+          setPhotoQuality({ score: 40, feedback: `Adjusting: ${validation.reason}` });
+          currentPromptInstruction = validation.retryInstruction || "Fix composition";
+          attempts++;
+        }
+      }
+
+      if (!finalImage) throw new Error("Failed to generate valid scene.");
+
+      scene.imageUrl = finalImage;
       scene.status = 'done';
     } catch (err: any) {
       scene.status = 'error';

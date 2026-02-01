@@ -278,7 +278,43 @@ export const analyzeImage = async (imageUrl: string, prompt: string): Promise<st
     prompt
   ]);
 
-  return result.response.text() || "No analysis available.";
+  return result.response.text();
+};
+
+export const validateBookSpread = async (imageUrl: string): Promise<{ isValid: boolean; reason?: string; retryInstruction?: string }> => {
+  const genAI = getFreshAI();
+  const base64 = imageUrl.split(',')[1];
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+
+  const prompt = `
+    Analyze this book spread image. It will be split specifically down the EXACT VERTICAL CENTER (50% width) to form two pages.
+    
+    CHECK FOR FATAL FLAWS:
+    1. FOLD SAFETY: Is a character's face or a crucial text element located exactly on the vertical center line? (e.g., cut in half by the spine).
+    2. CROP SAFETY: Are the main characters' heads or key text elements cut off at the top, bottom, or side edges?
+    3. COMPOSITION: Is the image mainly empty or broken?
+
+    Return a JSON object:
+    {
+      "isValid": boolean, // true if NO fatal flaws. false if faces/text are cut.
+      "reason": "short explanation of the flaw",
+      "retryInstruction": "specific instruction to fix it, e.g., 'Zoom out and move characters to the left to avoid the center fold'"
+    }
+  `;
+
+  try {
+    const result = await model.generateContent([
+      { inlineData: { mimeType: 'image/png', data: base64 } },
+      prompt
+    ]);
+    const text = result.response.text();
+    // Clean JSON string if needed (remove markdown)
+    const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(jsonString);
+  } catch (e) {
+    console.error("Validation failed", e);
+    return { isValid: true }; // Default to valid if validation fails to avoid infinite loops on error
+  }
 };
 
 export const describeAsset = async (base64Photo: string, assetType: string): Promise<{ name: string, description: string }> => {
