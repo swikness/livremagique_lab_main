@@ -115,14 +115,19 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
     - Generate a 'prompt' using this EXACT TEMPLATE:
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
-      COMPOSITION RULE: Create a WIDE CINEMATIC SCENE (Aspect Ratio 16:9). The main characters (${input.name} and ${input.partnerName || ''}) are positioned using the RULE OF THIRDS [Describe specific action and NEW clothing]. 
-      SPLIT SAFETY: This wide image will be split in half. Avoid placing important faces exactly in the dead center.
-      CHARACTER CONSISTENCY RULE: The characters MUST be facing the camera/viewer. Do NOT show side profiles unless explicitly necessary for the action. 
+      COMPOSITION RULE: STRICT SIDE-BY-SIDE LAYOUT.
+      - You MUST choose ONE of these two layouts for this scene:
+          Option A: [Characters on LEFT 40%] + [Uncluttered Background on RIGHT 60% for Text]
+          Option B: [Characters on RIGHT 40%] + [Uncluttered Background on LEFT 60% for Text]
+      - CENTER SAFETY: The exact vertical center (50%) is the book spine. Do NOT place important faces or text here.
+      - TEXT AREA: The 'Uncluttered Background' must be a seamless part of the scene (e.g., open sky, blurry wall, distant landscape). DO NOT use plain white/black.
+      
+      CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave 10-15% margin around the characters' heads and arms. Do NOT cut them off at the edge.
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
-      TEXT PLACEMENT: Ensure there is negative space on the sides for text overlay.
-       TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a clear, readable font that fits the art style. Place it in the negative space or semi-transparent overlay area you created.
-       TEXT: [STORY_TEXT]"
+      TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area you created.
+      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a clear, readable font that fits the art style.
+      TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX 16 (BACK COVER):
     - Summary of the book (in ${input.language}).
@@ -172,7 +177,8 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
       FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.
       ORIENTATION RULE: Characters must be facing the FRONT/CAMERA as much as possible to ensure likeness visibility.
       CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
-      TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.` }
+      TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.
+      SAFETY MARGINS: Ensure the characters are fully visible with space above their heads and around their arms. Do NOT cut off features at the edge. ZOOM OUT slightly if needed. NO BORDERS. NO FRAMES. RENDER THE SCENE DIRECTLY.` }
   ];
 
   if (mainCharacterPhoto) {
