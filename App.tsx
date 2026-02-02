@@ -580,8 +580,9 @@ const App: React.FC = () => {
       } else if (cropTarget === 'scene' && sceneToCropIndex !== null && storyPlan) {
         const newScenes = [...storyPlan.scenes];
         const scene = newScenes[sceneToCropIndex];
-        if (scene.imageUrl) scene.history = [scene.imageUrl, ...scene.history].slice(0, 20);
-        scene.imageUrl = croppedImage;
+        if (scene.imageUrl) scene.history = [scene.imageUrl, ...scene.history].slice(0, 20); // Legacy history handling? No, let's use addToHistory
+        addToHistory(scene, croppedImage);
+
         scene.aspectRatio = '2:1';
         const [left, right] = await splitImage(croppedImage);
         scene.splitImages = [left, right];
@@ -599,6 +600,69 @@ const App: React.FC = () => {
     scene.splitImages = undefined;
     scene.aspectRatio = '16:9';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
+  };
+
+  const addToHistory = (scene: Scene, newImageUrl: string) => {
+    if (!scene.history) scene.history = [];
+
+    // If there is an existing image but history is empty, assume it was the start
+    if (scene.imageUrl && scene.history.length === 0) {
+      scene.history.push(scene.imageUrl);
+    }
+
+    const currentIdx = scene.historyIndex ?? (scene.history.length > 0 ? scene.history.length - 1 : -1);
+
+    // Slice history to current point (remove redo future)
+    const validHistory = currentIdx >= 0 ? scene.history.slice(0, currentIdx + 1) : [];
+
+    scene.history = [...validHistory, newImageUrl];
+    scene.historyIndex = scene.history.length - 1;
+    scene.imageUrl = newImageUrl;
+  };
+
+  const handleHistoryUndo = (index: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+
+    if (scene.historyIndex !== undefined && scene.historyIndex > 0) {
+      scene.historyIndex--;
+      scene.imageUrl = scene.history[scene.historyIndex];
+      // If we undo a split, we might need to reset splitImages? 
+      // For now, let's assume image URL defines state. 
+      // TODO: ideally history should store full state objects, but for now we track images.
+      // If previous image was 16:9, we should propagate that?
+      // Infer aspect ratio from image or history? 
+      // For simplicity: We keep current aspectRatio logic unless explicit.
+      // But if we go back to a 16:9 image from a 2:1 split, we have valid splitImages sitting there?
+      // Let's plain set the image. User can clear split if needed.
+
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
+  };
+
+  const handleHistoryRedo = (index: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+
+    if (scene.history && scene.historyIndex !== undefined && scene.historyIndex < scene.history.length - 1) {
+      scene.historyIndex++;
+      scene.imageUrl = scene.history[scene.historyIndex];
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
+  };
+
+  const handleJumpToHistory = (index: number, historyIdx: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+
+    if (scene.history && scene.history[historyIdx]) {
+      scene.historyIndex = historyIdx;
+      scene.imageUrl = scene.history[historyIdx];
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
   };
 
   const addExtra = () => {
@@ -762,7 +826,9 @@ const App: React.FC = () => {
       try {
         const croppedPanoromic = await autoCropToRatio(scene.imageUrl, 2);
         const [left, right] = await splitImage(croppedPanoromic);
-        scene.imageUrl = croppedPanoromic; // Update main image to the 2:1 cropped version
+
+        addToHistory(scene, croppedPanoromic);
+
         scene.splitImages = [left, right];
         scene.aspectRatio = '2:1';
         scene.printRatio = '2:1';
@@ -787,7 +853,7 @@ const App: React.FC = () => {
     try {
       // Use editSceneImage from geminiService
       const newImage = await editSceneImage(scene, instruction, userInput.photoBase64, userInput.partnerPhotoBase64);
-      scene.imageUrl = newImage;
+      addToHistory(scene, newImage);
       scene.status = 'done';
       // Keep existing aspect ratio
       setStoryPlan({ ...storyPlan, scenes: newScenes });
@@ -824,7 +890,9 @@ const App: React.FC = () => {
       // We do NOT auto-crop scenes anymore. We keep them 16:9.
       // We do NOT validate spreads here (it's done in bulk process or manual review).
 
-      scene.imageUrl = rawImage;
+      // We do NOT validate spreads here (it's done in bulk process or manual review).
+
+      addToHistory(scene, rawImage);
       scene.status = 'done';
       // Reset aspect ratio to generation native
       scene.aspectRatio = isCover ? '1:1' : '16:9';
@@ -1592,6 +1660,40 @@ const App: React.FC = () => {
                         </button>
                       </div>
                     </div>
+
+                    {/* History Navigation */}
+                    {scene.imageUrl && (
+                      <div className="flex items-center gap-2 mb-2 bg-slate-950/30 p-2 rounded-lg">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleHistoryUndo(idx)}
+                            disabled={!scene.historyIndex || scene.historyIndex <= 0}
+                            className={`w-6 h-6 rounded flex items-center justify-center ${(!scene.historyIndex || scene.historyIndex <= 0) ? 'text-slate-700' : 'text-slate-300 hover:bg-slate-700'}`}
+                          >
+                            <i className="fas fa-arrow-left text-[10px]"></i>
+                          </button>
+                          <button
+                            onClick={() => handleHistoryRedo(idx)}
+                            disabled={scene.historyIndex === undefined || (scene.history && scene.historyIndex >= scene.history.length - 1)}
+                            className={`w-6 h-6 rounded flex items-center justify-center ${(!scene.history || scene.historyIndex === undefined || scene.historyIndex >= scene.history.length - 1) ? 'text-slate-700' : 'text-slate-300 hover:bg-slate-700'}`}
+                          >
+                            <i className="fas fa-arrow-right text-[10px]"></i>
+                          </button>
+                        </div>
+                        {/* Thumbnails */}
+                        <div className="flex-1 flex gap-1 overflow-x-auto custom-scrollbar pb-1">
+                          {(scene.history || []).map((hImg, hIdx) => (
+                            <button
+                              key={hIdx}
+                              onClick={() => handleJumpToHistory(idx, hIdx)}
+                              className={`shrink-0 w-6 h-6 rounded overflow-hidden border ${hIdx === scene.historyIndex ? 'border-amber-400' : 'border-slate-700 opacity-50 hover:opacity-100'}`}
+                            >
+                              <img src={hImg} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Magic Edit Input */}
                     {scene.imageUrl && (
