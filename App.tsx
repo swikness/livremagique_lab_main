@@ -273,6 +273,7 @@ const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [ultimateProgress, setUltimateProgress] = useState<number | null>(null);
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -862,6 +863,84 @@ const App: React.FC = () => {
       scene.status = 'error';
       setErrorMessage("Magic Edit failed.");
       setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
+  };
+
+  const handleUltimateFlow = async () => {
+    if (!storyPlan) return;
+    setUltimateProgress(1);
+
+    try {
+      // 1. Generate All Images (0 - 16) = 17 steps
+      // 2. Auto Split Scenes (1 - 15) = 15 steps
+      // Total operations = 32 roughly
+
+      const totalOps = 32;
+      let completedOps = 0;
+
+      // Helper to update progress
+      const updateProg = () => {
+        completedOps++;
+        setUltimateProgress(Math.round((completedOps / totalOps) * 100));
+      };
+
+      // Step 1: Generate Images
+      const newScenes = [...storyPlan.scenes];
+      // We can run these in parallel batches or sequential? 
+      // Sequential is safer for rate limits and errors visibility, but slower.
+      // Let's do batches of 3.
+
+      for (let i = 0; i < newScenes.length; i += 3) {
+        const batch = [i, i + 1, i + 2].filter(idx => idx < newScenes.length);
+        await Promise.all(batch.map(async (idx) => {
+          const scene = newScenes[idx];
+          const isCover = idx === 0 || idx === 16;
+          try {
+            const rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+            newScenes[idx].imageUrl = rawImage;
+            addToHistory(newScenes[idx], rawImage);
+            newScenes[idx].status = 'done';
+            newScenes[idx].aspectRatio = isCover ? '1:1' : '16:9';
+            newScenes[idx].splitImages = undefined;
+          } catch (e) {
+            console.error(`Ultimate Gen Error at ${idx}`, e);
+            newScenes[idx].status = 'error';
+          } finally {
+            updateProg();
+          }
+        }));
+        setStoryPlan({ ...storyPlan, scenes: [...newScenes] }); // Update UI periodically
+      }
+
+      // Step 2: Auto Split Scenes (1-15)
+      for (let i = 1; i <= 15; i++) {
+        const scene = newScenes[i];
+        if (scene.imageUrl && scene.status === 'done') {
+          try {
+            const croppedPanoromic = await autoCropToRatio(scene.imageUrl, 2);
+            const [left, right] = await splitImage(croppedPanoromic);
+            addToHistory(scene, croppedPanoromic);
+            scene.splitImages = [left, right];
+            scene.aspectRatio = '2:1';
+            scene.printRatio = '2:1';
+          } catch (e) {
+            console.error(`Ultimate Split Error at ${i}`, e);
+          }
+        }
+        updateProg();
+      }
+
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+      setUltimateProgress(100);
+
+      // Step 3: Download PDF
+      await handleDownloadPDF('PAGES');
+
+    } catch (err) {
+      console.error("Ultimate Flow Failed", err);
+      setErrorMessage("Ultimate Generation Failed");
+    } finally {
+      setUltimateProgress(null);
     }
   };
 
@@ -1550,6 +1629,24 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 )}
+
+                <div className="h-8 w-px bg-slate-700 mx-2 hidden lg:block"></div>
+
+                {/* Ultimate Button */}
+                <button
+                  onClick={handleUltimateFlow}
+                  disabled={ultimateProgress !== null}
+                  className="relative overflow-hidden bg-gradient-to-r from-pink-600 via-purple-600 to-amber-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-purple-600/30 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95 disabled:opacity-80 disabled:cursor-not-allowed group"
+                >
+                  {ultimateProgress !== null && (
+                    <div className="absolute inset-0 bg-black/20" style={{ width: `${ultimateProgress}%`, transition: 'width 0.5s ease' }}></div>
+                  )}
+                  <i className={`fas fa-rocket text-lg ${ultimateProgress !== null ? 'animate-bounce' : 'group-hover:animate-pulse'}`}></i>
+                  <span className="relative z-10 flex flex-col items-start leading-tight">
+                    <span className="text-[12px]">{ultimateProgress !== null ? `${ultimateProgress}%` : 'ULTIMATE GENERATE'}</span>
+                    {ultimateProgress === null && <span className="text-[8px] opacity-80">Full Book + PDF</span>}
+                  </span>
+                </button>
 
                 <div className="h-8 w-px bg-slate-700 mx-2 hidden lg:block"></div>
 
