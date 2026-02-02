@@ -950,7 +950,7 @@ const App: React.FC = () => {
       const scene = storyPlan.scenes[index];
       if (scene.imageUrl) {
         // If it's cover (0 or 16), use logo
-        const addLogo = (index === 0 || index === 16);
+        const addLogo = false;
         await downloadImageWithLogo(scene.imageUrl, `${userInput.name}-Scene-${index}.png`, addLogo);
         // Stagger downloads slightly
         await new Promise(r => setTimeout(r, 200));
@@ -984,24 +984,7 @@ const App: React.FC = () => {
     try {
       // Index 0: Cover with Logo
       if (storyPlan.scenes[0].imageUrl) {
-        // Create canvas to add logo for PDF
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = await createImage(storyPlan.scenes[0].imageUrl);
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-
-        try {
-          const logoImg = await createImage(LOGO_PATH);
-          const logoWidth = canvas.width * 0.2;
-          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-          const x = (canvas.width - logoWidth) / 2;
-          const y = canvas.height - logoHeight - (canvas.height * 0.05);
-          ctx?.drawImage(logoImg, x, y, logoWidth, logoHeight);
-        } catch (e) { console.warn("PDF Logo Error", e); }
-
-        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 1024, 1024);
+        doc.addImage(storyPlan.scenes[0].imageUrl, 'PNG', 0, 0, 1024, 1024);
       }
 
       // Scenes 1-15 
@@ -1052,22 +1035,7 @@ const App: React.FC = () => {
       doc.addPage([1024, 1024]);
       doc.addPage([1024, 1024]);
       if (storyPlan.scenes[16].imageUrl) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = await createImage(storyPlan.scenes[16].imageUrl);
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        try {
-          const logoImg = await createImage(LOGO_PATH);
-          const logoWidth = canvas.width * 0.2;
-          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-          const x = (canvas.width - logoWidth) / 2;
-          const y = canvas.height - logoHeight - (canvas.height * 0.05);
-          ctx?.drawImage(logoImg, x, y, logoWidth, logoHeight);
-        } catch (e) { console.warn("PDF Logo Error", e); }
-
-        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 1024, 1024);
+        doc.addImage(storyPlan.scenes[16].imageUrl, 'PNG', 0, 0, 1024, 1024);
       }
 
       doc.save(`${userInput.name}-Magical-Book.pdf`);
@@ -1608,7 +1576,7 @@ const App: React.FC = () => {
                       <div className="flex gap-1">
                         {/* Download Single */}
                         {scene.imageUrl && (
-                          <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, (idx === 0 || idx === 16))} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download">
+                          <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, false)} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download">
                             <i className="fas fa-download"></i>
                           </button>
                         )}
