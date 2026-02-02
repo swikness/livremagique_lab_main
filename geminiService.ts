@@ -125,8 +125,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave 10-15% margin around the characters' heads and arms. Do NOT cut them off at the edge.
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
-      TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area you created.
-      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a clear, readable font that fits the art style.
+      TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area. CRITICAL: The text block must be at least 15% away from the EXACT VERTICAL CENTER (spine) and 10% away from the outer edges to avoid cut-off. Center the text block vertically within the available space.
+      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a SIMPLE, CLEAN, STANDARD FONT (like Serif or Sans-Serif) that is highly readable. Do NOT use cursive, handwriting, or fancy decorative fonts. The font style must be consistent across all scenes.
       TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX 16 (BACK COVER):
@@ -159,7 +159,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   };
 };
 
-export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string, logoBase64?: string): Promise<string> => {
+export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string, logoBase64?: string, isRandomize: boolean = false): Promise<string> => {
   const genAI = getFreshAI();
   const activeStyle = scene.overrideStyle || baseStyle;
   const styleKeywords = STYLE_DESCRIPTIONS[activeStyle];
@@ -176,7 +176,7 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
       text: `${finalPrompt} 
       FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.
       ORIENTATION RULE: Characters must be facing the FRONT/CAMERA as much as possible to ensure likeness visibility.
-      CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
+      ${isRandomize ? 'RANDOMIZATION INSTRUCTION: You MUST change the clothing and the background environment to be completely different from what might be expected, while keeping the scene context valid. Be creative with outfits and setting details.' : 'CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.'}
       TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.
       SAFETY MARGINS: Ensure the characters are fully visible with space above their heads and around their arms. Do NOT cut off features at the edge. ZOOM OUT slightly if needed. NO BORDERS. NO FRAMES. RENDER THE SCENE DIRECTLY.` }
   ];

@@ -1011,6 +1011,41 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRandomizeScene = async (index: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+    if (scene.imageUrl) {
+      scene.history = [scene.imageUrl, ...scene.history].slice(0, 20);
+    }
+    scene.status = 'loading';
+    setStoryPlan({ ...storyPlan, scenes: newScenes });
+    try {
+      const isCover = index === 0 || index === 16;
+      let rawImage = await generateSceneImage(
+        scene,
+        userInput.style,
+        userInput.photoBase64,
+        userInput.partnerPhotoBase64,
+        isCover ? (logoBase64 || undefined) : undefined,
+        true // isRandomize = true
+      );
+
+      addToHistory(scene, rawImage);
+      scene.status = 'done';
+      // Reset aspect ratio to generation native
+      scene.aspectRatio = isCover ? '1:1' : '16:9';
+      scene.splitImages = undefined;
+
+    } catch (err: any) {
+      scene.status = 'error';
+      console.error(err);
+      setErrorMessage(`Randomize failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
+  };
+
   const handleEditPhoto = async (index: number) => {
     if (!storyPlan || !storyPlan.scenes[index].editInstruction) return;
     const newScenes = [...storyPlan.scenes];
@@ -1050,6 +1085,13 @@ const App: React.FC = () => {
       scene.status = 'done';
       setStoryPlan({ ...storyPlan, scenes: newScenes });
     }
+  };
+
+  const handleToggleApproved = (index: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    newScenes[index].approved = !newScenes[index].approved;
+    setStoryPlan({ ...storyPlan, scenes: newScenes });
   };
 
   const handleEditScene = (index: number, field: string, value: string) => {
@@ -1291,8 +1333,11 @@ const App: React.FC = () => {
                 <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-amber-400" />
                 <i className="fas fa-search-plus text-slate-500"></i>
               </div>
-              <button onClick={saveCrop} className="px-10 py-3 bg-amber-400 text-slate-950 rounded-full font-bold shadow-lg shadow-amber-400/20 uppercase tracking-widest text-sm">
-                {uiLanguage === 'French' ? 'Appliquer' : 'Apply'}
+              <button onClick={saveCrop} className="px-10 py-3 bg-amber-400 text-slate-950 rounded-full font-bold shadow-lg shadow-amber-400/20 uppercase tracking-widest text-sm flex items-center gap-2">
+                {cropTarget === 'scene' && <i className="fas fa-columns"></i>}
+                {uiLanguage === 'French'
+                  ? (cropTarget === 'scene' ? 'Diviser' : 'Appliquer')
+                  : (cropTarget === 'scene' ? 'Split' : 'Apply')}
               </button>
             </div>
           </div>
@@ -1709,7 +1754,7 @@ const App: React.FC = () => {
             {/* Grid of Scenes */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
               {storyPlan.scenes.map((scene, idx) => (
-                <div key={idx} className={`relative bg-slate-900/50 rounded-3xl border ${scene.status === 'error' ? 'border-red-500/50' : scene.status === 'done' ? 'border-green-500/30' : 'border-slate-800'} overflow-hidden group hover:border-amber-400/50 transition-all shadow-lg flex flex-col`}>
+                <div key={idx} className={`relative bg-slate-900/50 rounded-3xl border ${scene.approved ? 'border-green-500/50 shadow-green-500/10' : scene.status === 'error' ? 'border-red-500/50' : scene.status === 'done' ? 'border-amber-400/30' : 'border-slate-800'} overflow-hidden group hover:border-amber-400/50 transition-all shadow-lg flex flex-col`}>
 
                   {/* Header */}
                   <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
@@ -1760,10 +1805,22 @@ const App: React.FC = () => {
                   <div className="p-4 space-y-3 flex-1 flex flex-col">
                     {/* Aspect Ratio Badge & Actions */}
                     <div className="flex gap-2 justify-between items-center mb-1">
-                      <span className="bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
-                        {scene.aspectRatio}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
+                          {scene.aspectRatio}
+                        </span>
+                        {scene.approved && (
+                          <span className="bg-green-500 text-slate-950 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-lg shadow-green-500/20 animate-in zoom-in">
+                            <i className="fas fa-check-circle"></i> Approved
+                          </span>
+                        )}
+                      </div>
                       <div className="flex gap-1">
+                        {/* Approve Box */}
+                        <button onClick={() => handleToggleApproved(idx)} className={`p-2 rounded-lg transition-all ${scene.approved ? 'bg-green-500 text-slate-950 shadow-lg shadow-green-500/20' : 'bg-slate-800 text-slate-500 hover:text-green-400 hover:bg-slate-700'}`} title="Mark as Approved">
+                          <i className={`fas ${scene.approved ? 'fa-check-circle' : 'fa-check'}`}></i>
+                        </button>
+
                         {/* Download Single */}
                         {scene.imageUrl && (
                           <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, false)} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download">
@@ -1777,6 +1834,9 @@ const App: React.FC = () => {
                           </button>
                         )}
                         {/* Regen */}
+                        <button onClick={() => handleRandomizeScene(idx)} className="p-2 rounded-lg bg-slate-800 text-purple-400 hover:text-white hover:bg-purple-500 transition-colors" title="Randomize (New Outfit/Bg)">
+                          <i className="fas fa-random"></i>
+                        </button>
                         <button onClick={() => handleGenerateScene(idx)} className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:text-white hover:bg-amber-500 transition-colors" title="Regenerate">
                           <i className="fas fa-sync-alt"></i>
                         </button>

@@ -45,6 +45,7 @@ export interface Scene {
   editInstruction?: string;
   splitImages?: [string, string]; // Resulting 1:1 pages after split
   historyIndex?: number;
+  approved?: boolean;
 }
 
 export interface StoryPlan {
