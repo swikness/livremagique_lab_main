@@ -754,7 +754,7 @@ const App: React.FC = () => {
 
   const handleExportToDrive = () => {
     // Client-side export shortcut
-    handleDownloadPDF('FULL');
+    handleDownloadPDF('PAGES');
   };
 
   const handleGenerateScene = async (index: number) => {
@@ -925,7 +925,7 @@ const App: React.FC = () => {
     setShowPrompts(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
-  const handleDownloadPDF = async (mode: 'FULL' | 'LITE' = 'FULL') => {
+  const handleDownloadPDF = async (format: 'PAGES' | 'SPREADS' = 'PAGES') => {
     if (!storyPlan) return;
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -960,32 +960,44 @@ const App: React.FC = () => {
       // Scenes 1-15 
       for (let i = 1; i <= 15; i++) {
         const scene = storyPlan.scenes[i];
-        let left, right;
 
-        if (scene.splitImages) {
-          [left, right] = scene.splitImages;
-        } else if (scene.imageUrl) {
-          // Auto-split if not already split
-          try {
-            const [l, r] = await splitImage(scene.imageUrl);
-            left = l;
-            right = r;
-          } catch (e) {
-            console.error("Auto-split failed for PDF", e);
-            left = scene.imageUrl; // Fallback
-            right = scene.imageUrl;
+        if (format === 'SPREADS') {
+          // Raw 16:9 Image (or whatever ratio it is)
+          if (scene.imageUrl) {
+            doc.addPage([1024, 576]); // approx 16:9 landscape
+            doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 576);
+          } else {
+            doc.addPage([1024, 576]);
           }
-        }
-
-        if (left && right) {
-          doc.addPage([1024, 1024]);
-          doc.addImage(isRTL ? right : left, 'PNG', 0, 0, 1024, 1024);
-          doc.addPage([1024, 1024]);
-          doc.addImage(isRTL ? left : right, 'PNG', 0, 0, 1024, 1024);
         } else {
-          // Fallback blank pages if no image
-          doc.addPage([1024, 1024]);
-          doc.addPage([1024, 1024]);
+          // PAGES mode (Split 1:1)
+          let left, right;
+
+          if (scene.splitImages) {
+            [left, right] = scene.splitImages;
+          } else if (scene.imageUrl) {
+            // Auto-split if not already split
+            try {
+              const [l, r] = await splitImage(scene.imageUrl);
+              left = l;
+              right = r;
+            } catch (e) {
+              console.error("Auto-split failed for PDF", e);
+              left = scene.imageUrl; // Fallback
+              right = scene.imageUrl;
+            }
+          }
+
+          if (left && right) {
+            doc.addPage([1024, 1024]);
+            doc.addImage(isRTL ? right : left, 'PNG', 0, 0, 1024, 1024);
+            doc.addPage([1024, 1024]);
+            doc.addImage(isRTL ? left : right, 'PNG', 0, 0, 1024, 1024);
+          } else {
+            // Fallback blank pages if no image
+            doc.addPage([1024, 1024]);
+            doc.addPage([1024, 1024]);
+          }
         }
       }
 
@@ -1465,13 +1477,24 @@ const App: React.FC = () => {
 
               <div className="flex items-center gap-4">
                 <div className="hidden lg:block text-slate-400 text-[10px] font-bold uppercase tracking-widest mr-2">
-                  {storyPlan.scenes.filter(s => s.status === 'done').length} / {storyPlan.scenes.length} Completed
+                  {/* Calculate pages ready: Covers (1 each) + Scenes (2 each if split, else 0) */}
+                  {storyPlan.scenes.reduce((acc, s, i) => {
+                    if (i === 0 || i === 16) return acc + (s.status === 'done' ? 1 : 0);
+                    return acc + (s.splitImages ? 2 : 0);
+                  }, 0)} / 32 Pages Ready
                 </div>
                 <div className="h-8 w-px bg-slate-700 hidden lg:block"></div>
-                <button onClick={handleExportToDrive} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
-                  <i className="fab fa-google-drive text-lg"></i>
-                  <span>Export to Drive</span>
-                </button>
+
+                <div className="flex gap-2">
+                  <button onClick={() => handleDownloadPDF('SPREADS')} className="bg-green-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+                    <i className="fas fa-file-pdf"></i>
+                    <span>PDF (17 Imgs)</span>
+                  </button>
+                  <button onClick={() => handleDownloadPDF('PAGES')} className="bg-emerald-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-xl shadow-emerald-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+                    <i className="fab fa-google-drive"></i>
+                    <span>PDF (32 Pages)</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1585,7 +1608,7 @@ const App: React.FC = () => {
       <footer className="mt-16 text-center text-slate-700 text-[10px] font-black uppercase tracking-[0.3em] pb-10">
         <p>&copy; 2025 {t.appTitle} &bull; CUSTOMIZED ADVENTURES</p>
       </footer>
-    </div>
+    </div >
   );
 };
 

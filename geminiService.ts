@@ -90,7 +90,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     Target Language for ALL TEXT: ${input.language}
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
     
-    CULTURAL CONTEXT: This story is for a Moroccan audience. The setting should reflect a vibrant blend of MODERN and TRADITIONAL Moroccan elements. Avoid purely ancient or rural stereotypes. Mix contemporary lifestyles (modern clothing, cities, technology) with traditional architecture and touches where appropriate. Keep the tone respectful and family-friendly.
+    CULTURAL CONTEXT: The story setting should reflect the visual style of the reference photos provided. Do not enforce any specific country unless obvious from the reference. Mix contemporary lifestyles with traditional touches if appropriate to the style. Keep the tone respectful and family-friendly.
     
     STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
     
@@ -116,13 +116,14 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
       TEXT PLACEMENT: Ensure there is negative space on the sides for text overlay.
-      TYPOGRAPHY: NO TEXT IN IMAGE. Pure illustration only.
-      TEXT: [STORY_TEXT]"
+       TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a clear, readable font that fits the art style. Place it in the negative space or semi-transparent overlay area you created.
+       TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX 16 (BACK COVER):
     - Summary of the book (in ${input.language}).
     - Title of the book mentioned.
     - Prompt follows the Front Cover logic but is a "closing scene".
+    - CRITICAL: Characters MUST BE FACING THE CAMERA (Front View).
     
     CRITICAL: All content within 'synopsis', 'title', 'storyText', and 'HEADLINE TEXT' must be written in ${input.language}.
     Return JSON format.
@@ -174,6 +175,15 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
       inlineData: {
         mimeType: 'image/jpeg',
         data: mainCharacterPhoto.split(',')[1]
+      }
+    });
+  }
+
+  if (partnerPhoto) {
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: partnerPhoto.split(',')[1]
       }
     });
   }
@@ -239,6 +249,15 @@ export const editSceneImage = async (scene: Scene, instruction: string, mainChar
       inlineData: {
         mimeType: 'image/jpeg',
         data: mainCharacterPhoto.split(',')[1]
+      }
+    });
+  }
+
+  if (partnerPhoto) {
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: partnerPhoto.split(',')[1]
       }
     });
   }
