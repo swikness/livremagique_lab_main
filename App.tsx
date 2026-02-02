@@ -50,7 +50,7 @@ const TRANSLATIONS = {
     toHim: "À LUI",
     yearsOfLove: "Nombre d'années d'amour",
     ans: "Ans",
-    chooseOptions: "Choisissez vos options (max 10) :",
+    chooseOptions: "Choisissez vos options (max 15) :",
     customOption: "Option Personnalisée",
     placeholderReasons: "Écrivez votre propre raison ici...",
     placeholderStory: "Racontez un souvenir spécial...",
@@ -73,7 +73,7 @@ const TRANSLATIONS = {
     restore: "Restaurer",
     editDetails: "Instructions de Retouche",
     generatingArt: "Génération de l'œuvre...",
-    book1Title: (name: string, gender: string) => `Livre 1 : "10 Raisons pour lesquelles je l'aime (${gender === 'HER' ? 'Elle' : 'Lui'}), ${name || '[Nom]'}"`,
+    book1Title: (name: string, gender: string) => `Livre 1 : "Raisons pour lesquelles je l'aime (${gender === 'HER' ? 'Elle' : 'Lui'}), ${name || '[Nom]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Livre 2 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : ${years} Ans d'Amour"`,
     book3Title: (n1: string, n2: string) => `Livre 3 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : Notre Liste de Rêves"`,
   },
@@ -104,7 +104,7 @@ const TRANSLATIONS = {
     toHim: "FOR HIM",
     yearsOfLove: "Years of Love",
     ans: "Years",
-    chooseOptions: "Choose your options (max 10):",
+    chooseOptions: "Choose your options (max 15):",
     customOption: "Custom Option",
     placeholderReasons: "Write your own reason here...",
     placeholderStory: "Tell a special memory...",
@@ -127,7 +127,7 @@ const TRANSLATIONS = {
     restore: "Restore",
     editDetails: "Edit Instructions",
     generatingArt: "Generating Artwork...",
-    book1Title: (name: string, gender: string) => `Book 1: "10 Reasons why I love ${gender === 'HER' ? 'HER' : 'HIM'}, ${name || '[Name]'}"`,
+    book1Title: (name: string, gender: string) => `Book 1: "Reasons why I love ${gender === 'HER' ? 'HER' : 'HIM'}, ${name || '[Name]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Book 2: "${n1 || '[Him]'} & ${n2 || '[Her]'} : ${years} Years of Love"`,
     book3Title: (n1: string, n2: string) => `Book 3: "${n1 || '[Him]'} & ${n2 || '[Her]'} : Our Bucket List"`,
   }
@@ -405,7 +405,7 @@ const App: React.FC = () => {
         return prev.filter(o => o !== option);
       }
       if (prev.length >= 10) {
-        setErrorMessage(uiLanguage === 'French' ? "Maximum de 10 options." : "Maximum of 10 options.");
+        setErrorMessage(uiLanguage === 'French' ? "Maximum de 15 options." : "Maximum of 15 options.");
         return prev;
       }
       return [...prev, option];
@@ -414,8 +414,8 @@ const App: React.FC = () => {
 
   const handleAddCustomOption = () => {
     if (!customOption.trim()) return;
-    if (selectedOptions.length >= 10) {
-      setErrorMessage(uiLanguage === 'French' ? "Maximum de 10 options." : "Maximum of 10 options.");
+    if (selectedOptions.length >= 15) {
+      setErrorMessage(uiLanguage === 'French' ? "Maximum de 15 options." : "Maximum of 15 options.");
       return;
     }
     const val = customOption.trim();
@@ -1496,7 +1496,7 @@ const App: React.FC = () => {
                             <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                               {t.chooseOptions}
                             </h5>
-                            <span className={`text-[10px] font-bold ${selectedOptions.length === 10 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 10</span>
+                            <span className={`text-[10px] font-bold ${selectedOptions.length === 15 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 15</span>
                           </div>
 
                           <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
