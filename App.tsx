@@ -1346,7 +1346,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.6
+          v1.0.7
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1619,10 +1619,10 @@ const App: React.FC = () => {
                 <div className="space-y-3">
                   <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.artStyle}</label>
                   <div className="grid grid-cols-1 gap-2">
-                    {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.VECTOR_ART].map(s => (
+                    {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.REALISTIC, StoryStyle.VECTOR_ART].map(s => (
                       <button key={s} onClick={() => setUserInput(p => ({ ...p, style: s }))} className={`p-3 rounded-xl border text-left flex items-center gap-4 transition-all ${userInput.style === s ? 'border-amber-400 bg-amber-400/10 text-amber-400' : 'border-slate-700 text-slate-500'}`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${userInput.style === s ? 'bg-amber-400 text-slate-950' : 'bg-slate-800'}`}>
-                          <i className={`fas ${s === StoryStyle.SEMI_REALISTIC ? 'fa-brush' : s === StoryStyle.ANIMATION_3D ? 'fa-wand-sparkles' : 'fa-bezier-curve'}`}></i>
+                          <i className={`fas ${s === StoryStyle.SEMI_REALISTIC ? 'fa-brush' : s === StoryStyle.ANIMATION_3D ? 'fa-wand-sparkles' : s === StoryStyle.REALISTIC ? 'fa-camera' : 'fa-bezier-curve'}`}></i>
                         </div>
                         <div className="font-bold text-xs uppercase tracking-widest">{s}</div>
                       </button>
@@ -1823,12 +1823,18 @@ const App: React.FC = () => {
 
                         {/* Download Single */}
                         {scene.imageUrl && (
-                          <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, false)} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download">
+                          <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, false)} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download Image">
                             <i className="fas fa-download"></i>
                           </button>
                         )}
+                        {/* Uncrop Button (Show only if split) */}
+                        {scene.splitImages && (
+                          <button onClick={() => handleUncrop(idx)} className="p-2 rounded-lg bg-slate-800 text-pink-400 hover:text-white hover:bg-pink-600 transition-colors" title="Uncrop / Reset View">
+                            <i className="fas fa-expand"></i>
+                          </button>
+                        )}
                         {/* Auto Split Single (Only for Scenes 1-15 that are not yet split) */}
-                        {scene.imageUrl && idx !== 0 && idx !== 16 && (
+                        {scene.imageUrl && idx !== 0 && idx !== 16 && !scene.splitImages && (
                           <button onClick={() => handleAutoSplitSingle(idx)} className="p-2 rounded-lg bg-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 transition-colors" title="Auto Split (2:1)">
                             <i className="fas fa-cut"></i>
                           </button>
@@ -1837,7 +1843,7 @@ const App: React.FC = () => {
                         <button onClick={() => handleRandomizeScene(idx)} className="p-2 rounded-lg bg-slate-800 text-purple-400 hover:text-white hover:bg-purple-500 transition-colors" title="Randomize (New Outfit/Bg)">
                           <i className="fas fa-random"></i>
                         </button>
-                        <button onClick={() => handleGenerateScene(idx)} className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:text-white hover:bg-amber-500 transition-colors" title="Regenerate">
+                        <button onClick={() => handleGenerateScene(idx)} className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:text-white hover:bg-amber-500 transition-colors" title="Regenerate Scene">
                           <i className="fas fa-sync-alt"></i>
                         </button>
                       </div>

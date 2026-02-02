@@ -35,6 +35,7 @@ export const getCustomApiKey = () => {
 
 const STYLE_DESCRIPTIONS = {
   [StoryStyle.SEMI_REALISTIC]: "semi-realistic digital painting, high-quality concept art, illustrative style, painterly textures, natural facial proportions, cinematic lighting, atmospheric depth, soft detailed shading, dramatic composition, ArtStation trending, fantasy realism, no cartoon features, no 3D render.",
+  [StoryStyle.REALISTIC]: "ultra-realistic photography style, 8k resolution, highly detailed, cinematic lighting, photorealistic characters, depth of field, sharp focus, professional photography, Fujifilm GFX 100, natural skin textures, volumetric lighting.",
   [StoryStyle.ANIMATION_3D]: "3D animation style, Pixar inspired, C4D, Octane Render, cinematic lighting, volumetric atmosphere, hyper-detailed textures, 8k, masterpiece, ray-tracing, soft studio lighting, magical realism, vibrant colors, sharp focus.",
   [StoryStyle.VECTOR_ART]: "modern commercial vector illustration, 2D flat design with soft gradient shading, cute avatar style, big head small body proportions, vibrant saturated colors, clean sharp edges, smooth vector gradients, romantic cartoon, playful and expressive, highly polished digital art"
 };
@@ -93,6 +94,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     CULTURAL CONTEXT: The story setting should reflect the visual style of the reference photos provided. Do not enforce any specific country unless obvious from the reference. Mix contemporary lifestyles with traditional touches if appropriate to the style. Keep the tone respectful and family-friendly.
     
     STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
+
+    PROMPT GENERATION RULE: In the 'prompt' field for scenes, YOU MUST NOT use the names of the characters (like '${input.name}'). Instead, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple", or "reference photo". The AI image generator does not know the names.
     
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
@@ -109,7 +112,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
@@ -176,6 +179,7 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
       text: `${finalPrompt} 
       FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.
       ORIENTATION RULE: Characters must be facing the FRONT/CAMERA as much as possible to ensure likeness visibility.
+      SIDE CHARACTER RULE: If there are other characters mentioned who are NOT the main protagonists, they must be facing AWAY from the camera or have their faces obscured/blurred/in shadow. Only the Main Characters (whose photos are attached) should have visible faces.
       ${isRandomize ? 'RANDOMIZATION INSTRUCTION: You MUST change the clothing and the background environment to be completely different from what might be expected, while keeping the scene context valid. Be creative with outfits and setting details.' : 'CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.'}
       TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.
       SAFETY MARGINS: Ensure the characters are fully visible with space above their heads and around their arms. Do NOT cut off features at the edge. ZOOM OUT slightly if needed. NO BORDERS. NO FRAMES. RENDER THE SCENE DIRECTLY.` }

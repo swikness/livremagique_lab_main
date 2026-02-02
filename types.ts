@@ -8,6 +8,7 @@ export enum AppStep {
 export enum StoryStyle {
   ANIMATION_3D = '3D Animation',
   SEMI_REALISTIC = 'Semi-Realistic',
+  REALISTIC = 'Realistic',
   VECTOR_ART = 'Vector Illustration'
 }
 
