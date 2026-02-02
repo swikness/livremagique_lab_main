@@ -103,7 +103,11 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
-    - MANDATORY: The Title text of the book MUST explicitly contain the names: "${input.name}"${input.audience === TargetAudience.LOVERS ? ` and "${input.partnerName}"` : ''}.
+    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
+      1. IF Theme is '10 Reasons to Love You': Title MUST be "10 RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
+      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
     - Generate a prompt using this template:
       "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 

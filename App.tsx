@@ -159,7 +159,19 @@ const LOVERS_OPTIONS_MAPPING = {
     "Avec toi, je me sens capable de tout affronter.",
     "Tu as cette douceur qui m'apaise instantanément.",
     "J'aime la façon dont tu vois le monde.",
-    "Tu es la plus belle rencontre de ma vie."
+    "Tu es la plus belle rencontre de ma vie.",
+    "Tu es mon rayon de soleil au quotidien.",
+    "J'admire ta force et ton courage.",
+    "Tu as un rire qui est contagieux.",
+    "Tu me comprends mieux que personne.",
+    "Tu es mon inspiration de chaque instant.",
+    "J'aime ta spontanéité et ta joie de vivre.",
+    "Tu es unique et irremplaçable.",
+    "Ta présence me suffit pour être heureux.",
+    "Tu as transformé ma vie en un conte de fées.",
+    "J'aime la façon dont tu prends soin des autres.",
+    "Tu es la personne la plus généreuse que je connaisse.",
+    "Chaque moment avec toi est un cadeau."
   ],
   'HIM': [
     "Tu me fais me sentir en sécurité.",
@@ -211,7 +223,14 @@ const LOVERS_OPTIONS_MAPPING = {
     "Le moment où l'on a réalisé qu'on avait les mêmes rêves.",
     "Cette fois où l'on a regardé les étoiles jusqu'au matin.",
     "Quand tu m'as surpris(e) avec ce cadeau inoubliable.",
-    "Notre premier 'Je t'aime' échangé timidement."
+    "Notre premier 'Je t'aime' échangé timidement.",
+    "La première fois que je t'ai présenté(e) à ma famille.",
+    "Une soirée surprise que tu m'as organisée.",
+    "Le jour où l'on a surmonté une épreuve ensemble.",
+    "Nos fous rires en cuisinant.",
+    "Ce moment de calme où juste être ensemble suffisait.",
+    "Quand on s'est perdu ensemble lors d'une balade.",
+    "La première fois qu'on a fait des projets d'avenir."
   ],
 
   'BUCKET_LIST': [
@@ -238,7 +257,13 @@ const LOVERS_OPTIONS_MAPPING = {
     "Apprendre à cuisiner comme des chefs étoilés.",
     "Visiter le Japon au printemps pour les cerisiers.",
     "Avoir un jardin potager et manger nos propres légumes.",
-    "Faire une croisière de luxe sans rien faire d'autre que relaxer."
+    "Faire une croisière de luxe sans rien faire d'autre que relaxer.",
+    "Dormir dans une cabane perchée dans les arbres.",
+    "Nager avec des dauphins ou des tortues.",
+    "Faire un marathon (ou du moins essayer !) ensemble.",
+    "Apprendre une danse de salon pour briller en soirée.",
+    "Voir les pyramides d'Égypte de nos propres yeux.",
+    "Faire du bénévolat ensemble pour une cause qui nous tient à cœur."
   ]
 };
 
@@ -1276,7 +1301,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.3
+          v1.0.4
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
