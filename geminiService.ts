@@ -93,12 +93,12 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     CULTURAL CONTEXT: This story is for a Moroccan audience. The setting should reflect a vibrant blend of MODERN and TRADITIONAL Moroccan elements. Avoid purely ancient or rural stereotypes. Mix contemporary lifestyles (modern clothing, cities, technology) with traditional architecture and touches where appropriate. Keep the tone respectful and family-friendly.
     
     STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
-
+    
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
     2. An array of 17 components:
        - Index 0: Front Cover
-       - Index 1 to 15: Story scenes (Double-page spread compositions)
+       - Index 1 to 15: Story scenes (wide cinematic shots)
        - Index 16: Back Cover
 
     RULES FOR INDEX 0 (FRONT COVER):
@@ -107,17 +107,16 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe ${input.name} ${input.audience === TargetAudience.LOVERS ? 'and ' + input.partnerName : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
-    - Determine a 'characterSide' ('LEFT' or 'RIGHT').
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
     - Generate a 'prompt' using this EXACT TEMPLATE:
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
-      COMPOSITION RULE: Create a wide, continuous scene (Aspect Ratio 2:1). The main characters (${input.name} and ${input.partnerName || ''}) are positioned on the [SIDE] side [Describe specific action and NEW clothing]. 
-      CENTER FOLD SAFETY: This image will be a double-page book spread. Keep the EXACT VERTICAL CENTER (the middle 10%) free of important details like faces or text, as it will be the book fold.
+      COMPOSITION RULE: Create a WIDE CINEMATIC SCENE (Aspect Ratio 16:9). The main characters (${input.name} and ${input.partnerName || ''}) are positioned using the RULE OF THIRDS [Describe specific action and NEW clothing]. 
+      SPLIT SAFETY: This wide image will be split in half. Avoid placing important faces exactly in the dead center.
       CHARACTER CONSISTENCY RULE: The characters MUST be facing the camera/viewer. Do NOT show side profiles unless explicitly necessary for the action. 
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
-      TEXT PLACEMENT: The text must be placed strictly on the opposite side of the characters (the [OPPOSITE_SIDE] side), avoiding the center.
-      TYPOGRAPHY: Use clean, simple, highly legible, standard font for the story text. DO NOT use fancy effects.
+      TEXT PLACEMENT: Ensure there is negative space on the sides for text overlay.
+      TYPOGRAPHY: NO TEXT IN IMAGE. Pure illustration only.
       TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX 16 (BACK COVER):
@@ -143,7 +142,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       history: [],
       status: 'idle',
       // UPGRADE: 16:9 for scenes, 1:1 for covers
-      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9'
+      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9',
+      generationRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9'
     }))
   };
 };

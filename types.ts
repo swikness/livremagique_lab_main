@@ -37,11 +37,13 @@ export interface Scene {
   history: string[];
   status: 'idle' | 'loading' | 'done' | 'error';
   correctionAnalysis?: string;
-  aspectRatio: '1:1' | '16:9' | '2:1';
+  aspectRatio: '1:1' | '16:9' | '2:1'; // Current state of the image
+  generationRatio?: '1:1' | '16:9'; // Original generation ratio
+  printRatio?: '1:1' | '2:1'; // Target ratio for printing/splitting
   overrideStyle?: StoryStyle;
   characterSide?: 'LEFT' | 'RIGHT';
   editInstruction?: string;
-  splitImages?: [string, string];
+  splitImages?: [string, string]; // Resulting 1:1 pages after split
 }
 
 export interface StoryPlan {
@@ -59,7 +61,7 @@ export interface UserInput {
   partnerAge?: string;
   partnerGender?: string;
   partnerPhotoBase64?: string;
-  
+
   audience: TargetAudience;
   theme: string;
   selectedThemes: string[];

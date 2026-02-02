@@ -436,12 +436,14 @@ const App: React.FC = () => {
     let offsetX = 0;
     let offsetY = 0;
 
+    // We want to force fit into targetRatio
     if (sourceRatio > targetRatio) {
       // Source is wider than target: Crop width (sides)
       drawWidth = image.height * targetRatio;
       offsetX = (image.width - drawWidth) / 2;
     } else {
-      // Source is taller than target: Crop height (top/bottom)
+      // Source is taller/squarer than target: Crop height (top/bottom)
+      // Example: 16:9 (1.77) to 2:1 (2.0). Source is "taller" relative to the wide target.
       drawHeight = image.width / targetRatio;
       offsetY = (image.height - drawHeight) / 2;
     }
@@ -659,27 +661,26 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerateAll = async () => {
+  const handleProcessSceneQueue = async (queueIndices: number[]) => {
     if (!storyPlan) return;
     stopGenerationRef.current = false;
     isPausedRef.current = false;
     setIsPaused(false);
+    setIsGeneratingScenes(true);
 
-    // Create a copy to track local progress
     let currentScenes = [...storyPlan.scenes];
-
-    // Mark pending scenes as loading
-    const updatedScenes = currentScenes.map(scene => {
-      if (scene.status !== 'done') return { ...scene, status: 'loading' };
+    // Mark queue as loading
+    const updatedScenes = currentScenes.map((scene, idx) => {
+      // Only set to loading if not already done, or if forced?
+      // For now, only process 'idle' or 'error' or explicit re-runs. 
+      // But this function is called by "Generate All" buttons which usually imply doing work.
+      if (queueIndices.includes(idx) && scene.status !== 'done') return { ...scene, status: 'loading' };
       return scene;
     });
     setStoryPlan({ ...storyPlan, scenes: updatedScenes as Scene[] });
 
-    // Process sequentially
-    for (let i = 0; i < updatedScenes.length; i++) {
+    for (const i of queueIndices) {
       if (stopGenerationRef.current) break;
-
-      // Handle Pause
       while (isPausedRef.current) {
         if (stopGenerationRef.current) break;
         await new Promise(r => setTimeout(r, 500));
@@ -689,80 +690,21 @@ const App: React.FC = () => {
       if (scene.status === 'done') continue;
 
       try {
-        const isCover = i === 0 || i === 16;
-
-        let attempts = 0;
-        let finalImage = "";
-        let currentPromptInstruction = ""; // Additional instruction for retries
-
-        while (attempts < 3) {
-          console.log(`Generation Attempt ${attempts + 1} for Scene ${i}`);
-
-          // 1. Generate (or Edit if retry)
-          let rawImage;
-          if (attempts === 0) {
-            rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-          } else {
-            // On retry, use editSceneImage to fix the specific issue
-            // We pass the PREVIOUS image to fix it, or we could regenerate from scratch. 
-            // Regenerating from scratch with instruction is often cleaner for "bad composition".
-            scene.prompt += ` IMPROVEMENT INSTRUCTION: ${currentPromptInstruction}`;
-            rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-          }
-
-          // 2. Auto-Crop to 2:1
-          // Covers are excluded from auto-cropping as per user request.
-          // Scenes are cropped to 2:1 (Two Squares)
-          let croppedImage = rawImage;
-
-          if (isCover) {
-            finalImage = rawImage;
-            break;
-          }
-
-          // Only crop scenes
-          croppedImage = await autoCropToRatio(rawImage, 2);
-
-          // 3. Validate
-          const validation = await validateBookSpread(croppedImage);
-          console.log(`Validation result for Scene ${i}:`, validation);
-
-          if (validation.isValid) {
-            finalImage = croppedImage;
-            setPhotoQuality({ score: 95, feedback: "Perfectly composed spread." });
-            break;
-          } else {
-            console.warn(`Scene ${i} rejected: ${validation.reason}`);
-            setPhotoQuality({ score: 40, feedback: `Adjusting: ${validation.reason}` });
-            currentPromptInstruction = validation.retryInstruction || "Fix composition";
-            attempts++;
-          }
-        }
-
-        if (!finalImage) throw new Error("Failed to generate valid scene after retries.");
-
-        scene.imageUrl = finalImage;
-        scene.status = 'done';
-
-        // Update state to show progress
-        setStoryPlan(prev => {
-          if (!prev) return null;
-          const newSc = [...prev.scenes];
-          newSc[i] = { ...scene }; // Update specific scene
-          return { ...prev, scenes: newSc };
-        });
-      } catch (err) {
-        console.error(`Failed to generate scene ${i}`, err);
-        scene.status = 'error';
-        setStoryPlan(prev => {
-          if (!prev) return null;
-          const newSc = [...prev.scenes];
-          newSc[i] = { ...scene };
-          return { ...prev, scenes: newSc };
-        });
+        await handleGenerateScene(i);
+      } catch (e) {
+        console.error(`Queue error at ${i}`, e);
       }
     }
     setIsGeneratingScenes(false);
+  };
+
+  const handleGenerateCovers = () => {
+    handleProcessSceneQueue([0, 16]);
+  };
+
+  const handleGenerateScenes = () => {
+    const indices = Array.from({ length: 15 }, (_, i) => i + 1);
+    handleProcessSceneQueue(indices);
   };
 
   const togglePause = () => {
@@ -775,53 +717,44 @@ const App: React.FC = () => {
     setIsGeneratingScenes(false);
   };
 
+  // Bulk processing: 16:9 -> 2:1 Crop -> 1:1 Split
   const handleAutoSplitAll = async () => {
     if (!storyPlan) return;
     const newScenes = [...storyPlan.scenes];
     let changed = false;
 
-    for (const scene of newScenes) {
+    // We only Auto-Split scenes 1-15 (The inner pages). 
+    // Covers (0 & 16) are 1:1 and don't need splitting.
+    for (let i = 1; i <= 15; i++) {
+      const scene = newScenes[i];
+
+      // Only process if we have an image and it's not already split
       if (scene.imageUrl && !scene.splitImages) {
-        // Basic auto-split logic (center crop assumption)
-        // For better results, we really need the crop tool, but this is a "quick" action
-        // So we will just split the existing image 50/50 without zooming if possible
-        // Or simlpy skip and tell user to crop. 
-        // Requirement says: "crop (it auto crops all the 15 scenes)"
-        // We'll assume center crop 2:1 aspect ratio from the center of the image.
-
-        // Since we can't easily do canvas ops in a loop without loading images, 
-        // we'll rely on a helper that loads, center crops 2:1, then splits.
-
         try {
-          const image = await createImage(scene.imageUrl);
-          // Calculate center 2:1 crop
-          const idealHeight = image.width / 2;
-          let finalWidth = image.width;
-          let finalHeight = idealHeight;
-          let startY = (image.height - idealHeight) / 2;
+          // 1. Auto-Crop to 2:1 (Center crop)
+          // This converts the 16:9 generation into a 2:1 panoramic
+          // Note: we're cropping HEIGHT here to make it 2:1
+          const croppedPanoromic = await autoCropToRatio(scene.imageUrl, 2);
 
-          if (idealHeight > image.height) {
-            // Image is too wide, fit height
-            finalHeight = image.height;
-            finalWidth = finalHeight * 2;
-            // startX would be needed
-          }
+          // 2. Split into two 1:1 squares
+          const [left, right] = await splitImage(croppedPanoromic);
 
-          // Actually, let's just use the full image and split it 50/50?
-          // The requirement implies making it book-ready (2 pages).
-          // Let's stick to the existing splitImage logic which takes the image and splits 50/50.
-          // But we must set aspect ratio to 2:1 to match UI state.
-          const [left, right] = await splitImage(scene.imageUrl);
           scene.splitImages = [left, right];
-          scene.aspectRatio = '1.7:1';
+          scene.printRatio = '2:1';
+          scene.aspectRatio = '2:1';
           changed = true;
         } catch (e) {
-          console.error("Failed to auto split", e);
+          console.error(`Failed to auto-process scene ${i}`, e);
         }
       }
     }
 
     if (changed) setStoryPlan({ ...storyPlan, scenes: newScenes });
+  };
+
+  const handleExportToDrive = () => {
+    // Client-side export shortcut
+    handleDownloadPDF('FULL');
   };
 
   const handleGenerateScene = async (index: number) => {
@@ -836,44 +769,20 @@ const App: React.FC = () => {
     try {
       const isCover = index === 0 || index === 16;
 
-      let attempts = 0;
-      let finalImage = "";
-      let currentPromptInstruction = "";
+      // For scenes, we generate 16:9 and keeping it.
+      // For covers, we generate 1:1.
 
-      while (attempts < 3) {
-        let rawImage;
-        if (attempts === 0) {
-          rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-        } else {
-          scene.prompt += ` IMPROVEMENT INSTRUCTION: ${currentPromptInstruction}`;
-          rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
-        }
+      let rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
 
-        const targetRatio = isCover ? 1 : 2;
-        const croppedImage = await autoCropToRatio(rawImage, targetRatio);
+      // We do NOT auto-crop scenes anymore. We keep them 16:9.
+      // We do NOT validate spreads here (it's done in bulk process or manual review).
 
-        if (isCover) {
-          finalImage = croppedImage;
-          break;
-        }
-
-        const validation = await validateBookSpread(croppedImage);
-
-        if (validation.isValid) {
-          finalImage = croppedImage;
-          setPhotoQuality({ score: 95, feedback: "Perfectly composed spread." });
-          break;
-        } else {
-          setPhotoQuality({ score: 40, feedback: `Adjusting: ${validation.reason}` });
-          currentPromptInstruction = validation.retryInstruction || "Fix composition";
-          attempts++;
-        }
-      }
-
-      if (!finalImage) throw new Error("Failed to generate valid scene.");
-
-      scene.imageUrl = finalImage;
+      scene.imageUrl = rawImage;
       scene.status = 'done';
+      // Reset aspect ratio to generation native
+      scene.aspectRatio = isCover ? '1:1' : '16:9';
+      scene.splitImages = undefined; // Reset any previous split if re-generating
+
     } catch (err: any) {
       scene.status = 'error';
       console.error(err);
@@ -936,7 +845,7 @@ const App: React.FC = () => {
     const newScenes = [...storyPlan.scenes];
     const current = newScenes[index].aspectRatio;
     if (current === '1:1') newScenes[index].aspectRatio = '16:9';
-    else if (current === '16:9') newScenes[index].aspectRatio = '1.7:1';
+    else if (current === '16:9') newScenes[index].aspectRatio = '2:1';
     else newScenes[index].aspectRatio = '1:1';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
   };
@@ -1171,7 +1080,7 @@ const App: React.FC = () => {
                 image={imageToCrop}
                 crop={crop}
                 zoom={zoom}
-                aspect={cropTarget === 'scene' ? 1.7 : 1}
+                aspect={cropTarget === 'scene' ? 2 : 1}
                 onCropChange={setCrop}
                 onCropComplete={onCropComplete}
                 onZoomChange={setZoom}
@@ -1532,25 +1441,36 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <button onClick={handleGenerateAll} className="bg-amber-400 text-slate-950 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-amber-500 shadow-xl shadow-amber-400/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
-                    <i className="fas fa-layer-group text-lg"></i>
-                    <span>Generate All Scenes</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={handleGenerateCovers} className="bg-purple-600 text-white px-5 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-purple-500 shadow-xl shadow-purple-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+                      <i className="fas fa-book-open"></i>
+                      <span>Gen Covers</span>
+                    </button>
+                    <button onClick={handleGenerateScenes} className="bg-amber-400 text-slate-950 px-5 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 shadow-xl shadow-amber-400/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+                      <i className="fas fa-film"></i>
+                      <span>Gen Scenes</span>
+                    </button>
+                  </div>
                 )}
-                <button onClick={handleAutoSplitAll} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
-                  <i className="fas fa-cut text-lg"></i>
-                  <span>Auto-Crop All</span>
-                </button>
+
+                <div className="h-8 w-px bg-slate-700 mx-2 hidden lg:block"></div>
+
+                <div className="flex gap-2">
+                  <button onClick={handleAutoSplitAll} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
+                    <i className="fas fa-cut"></i>
+                    <span>Process All</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="hidden lg:block text-slate-400 text-[10px] font-bold uppercase tracking-widest mr-2">
-                  {storyPlan.scenes.filter(s => s.status === 'done').length} / {storyPlan.scenes.length} Complets
+                  {storyPlan.scenes.filter(s => s.status === 'done').length} / {storyPlan.scenes.length} Completed
                 </div>
                 <div className="h-8 w-px bg-slate-700 hidden lg:block"></div>
-                <button onClick={() => handleDownloadPDF('FULL')} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
-                  <i className="fas fa-file-pdf text-lg"></i>
-                  <span>Download PDF</span>
+                <button onClick={handleExportToDrive} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95">
+                  <i className="fab fa-google-drive text-lg"></i>
+                  <span>Export to Drive</span>
                 </button>
               </div>
             </div>
