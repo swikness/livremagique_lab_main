@@ -752,6 +752,53 @@ const App: React.FC = () => {
     if (changed) setStoryPlan({ ...storyPlan, scenes: newScenes });
   };
 
+  const handleAutoSplitSingle = async (index: number) => {
+    if (!storyPlan) return;
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+
+    if (scene.imageUrl) {
+      setLoading(true);
+      try {
+        const croppedPanoromic = await autoCropToRatio(scene.imageUrl, 2);
+        const [left, right] = await splitImage(croppedPanoromic);
+        scene.imageUrl = croppedPanoromic; // Update main image to the 2:1 cropped version
+        scene.splitImages = [left, right];
+        scene.aspectRatio = '2:1';
+        scene.printRatio = '2:1';
+        setStoryPlan({ ...storyPlan, scenes: newScenes });
+      } catch (e) {
+        console.error(e);
+        setErrorMessage("Failed to auto-split this scene.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleMagicEdit = async (index: number, instruction: string) => {
+    if (!storyPlan || !instruction.trim()) return;
+
+    const newScenes = [...storyPlan.scenes];
+    const scene = newScenes[index];
+    scene.status = 'loading';
+    setStoryPlan({ ...storyPlan, scenes: newScenes }); // Show loading
+
+    try {
+      // Use editSceneImage from geminiService
+      const newImage = await editSceneImage(scene, instruction, userInput.photoBase64, userInput.partnerPhotoBase64);
+      scene.imageUrl = newImage;
+      scene.status = 'done';
+      // Keep existing aspect ratio
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    } catch (err: any) {
+      console.error(err);
+      scene.status = 'error';
+      setErrorMessage("Magic Edit failed.");
+      setStoryPlan({ ...storyPlan, scenes: newScenes });
+    }
+  };
+
   const handleExportToDrive = () => {
     // Client-side export shortcut
     handleDownloadPDF('PAGES');
@@ -1114,7 +1161,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.1
+          v1.0.2
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1548,32 +1595,69 @@ const App: React.FC = () => {
                     )}
 
                     {/* Hover Actions */}
-                    <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 to-transparent flex gap-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                      <button onClick={() => handleGenerateScene(idx)} className="flex-1 bg-amber-400 text-slate-950 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-colors">
-                        {scene.imageUrl ? 'Regen' : 'Generate'}
-                      </button>
-                      {scene.imageUrl && (
-                        <button onClick={() => openSceneCrop(idx)} className="w-10 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-500 transition-colors flex items-center justify-center">
-                          <i className="fas fa-crop-alt"></i>
-                        </button>
-                      )}
-                    </div>
                   </div>
 
                   {/* Content Area */}
+                  {/* Content Area */}
                   <div className="p-4 space-y-3 flex-1 flex flex-col">
-                    {/* Aspect Ratio & Style */}
-                    <div className="flex gap-2 justify-between">
+                    {/* Aspect Ratio Badge & Actions */}
+                    <div className="flex gap-2 justify-between items-center mb-1">
                       <span className="bg-slate-800 text-slate-400 px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-slate-700 flex items-center justify-center">
                         {scene.aspectRatio}
                       </span>
-                      {/* Toggle Prompt Button */}
-                      <button onClick={() => handleTogglePrompt(idx)} className="text-slate-500 hover:text-amber-400 transition-colors text-xs" title="Show/Hide Prompt">
-                        <i className={`fas ${showPrompts[idx] ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      <div className="flex gap-1">
+                        {/* Download Single */}
+                        {scene.imageUrl && (
+                          <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, (idx === 0 || idx === 16))} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Download">
+                            <i className="fas fa-download"></i>
+                          </button>
+                        )}
+                        {/* Auto Split Single (Only for Scenes 1-15 that are not yet split) */}
+                        {scene.imageUrl && idx !== 0 && idx !== 16 && (
+                          <button onClick={() => handleAutoSplitSingle(idx)} className="p-2 rounded-lg bg-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 transition-colors" title="Auto Split (2:1)">
+                            <i className="fas fa-cut"></i>
+                          </button>
+                        )}
+                        {/* Regen */}
+                        <button onClick={() => handleGenerateScene(idx)} className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:text-white hover:bg-amber-500 transition-colors" title="Regenerate">
+                          <i className="fas fa-sync-alt"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Magic Edit Input */}
+                    {scene.imageUrl && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Describe changes (e.g. 'Make him smile', 'Add sunset')..."
+                          className="flex-1 bg-slate-950/50 rounded-lg border border-slate-800 text-[10px] text-slate-300 px-3 py-2 focus:border-purple-500 outline-none"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleMagicEdit(idx, (e.target as HTMLInputElement).value);
+                              (e.target as HTMLInputElement).value = ''; // Clear after send
+                            }
+                          }}
+                        />
+                        <button onClick={(e) => {
+                          const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                          handleMagicEdit(idx, input.value);
+                          input.value = '';
+                        }} className="bg-purple-600 text-white px-3 rounded-lg hover:bg-purple-500 transition-colors font-bold">
+                          <i className="fas fa-magic"></i>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Prompt Toggle */}
+                    <div className="flex justify-end">
+                      <button onClick={() => handleTogglePrompt(idx)} className="text-[10px] text-slate-600 hover:text-slate-400 flex items-center gap-1">
+                        <i className={`fas ${showPrompts[idx] ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                        {showPrompts[idx] ? 'Hide Details' : 'Show Details'}
                       </button>
                     </div>
 
-                    {/* Prompt */}
+                    {/* Prompt Textarea */}
                     {showPrompts[idx] && (
                       <div className="relative group/prompt flex-1 animate-in fade-in slide-in-from-top-2">
                         <textarea
@@ -1582,17 +1666,7 @@ const App: React.FC = () => {
                           className="w-full h-full min-h-[80px] bg-slate-950/50 rounded-xl border border-slate-800 text-[10px] text-slate-400 p-3 focus:border-amber-400 outline-none resize-none transition-all scrollbar-thin"
                           placeholder="Scene Description..."
                         />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover/prompt:opacity-100 transition-opacity">
-                          <i className="fas fa-pen text-[10px] text-slate-600"></i>
-                        </div>
                       </div>
-                    )}
-
-                    {/* Download Button for individual card */}
-                    {scene.imageUrl && (
-                      <button onClick={() => downloadImageWithLogo(scene.imageUrl!, `${userInput.name}-Scene-${idx}.png`, (idx === 0 || idx === 16))} className="w-full py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                        <i className="fas fa-download"></i> Download
-                      </button>
                     )}
                   </div>
                 </div>
