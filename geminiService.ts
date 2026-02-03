@@ -97,6 +97,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 
     PROMPT GENERATION RULE: In the 'prompt' field for scenes, YOU MUST NOT use the names of the characters (like '${input.name}'). Instead, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple", or "reference photo". The AI image generator does not know the names.
     
+    NARRATIVE PERSONA: You MUST frequently use the Main Character's actual name (${input.name}) in the \`storyText\` to make it feel deeply personal. Do not just say 'he' or 'she' all the time.
+    
     MISSING REFERENCE PHOTO RULE: If a new character is mentioned or required by the story/theme but NO reference photo is provided for them in the inputs:
     1. STRICTLY LIMIT their presence. Do NOT make them a main part of the scene.
     2. NARRATIVE: Refer to them in the third person or indirectly (e.g. "The shopkeeper smiled" instead of a full dialogue).

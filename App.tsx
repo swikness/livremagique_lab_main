@@ -1196,6 +1196,29 @@ const App: React.FC = () => {
     const isRTL = userInput.language === 'Arabic';
     setLoading(true);
     try {
+      // VALIDATION: Check if all 17 scenes (0-16) generally have data
+      // For PDF generation, we specifically need the images to form the pages.
+      // SPREADS mode needs 17 images.
+      // PAGES mode needs 32 pages total:
+      // Page 1: Front Cover (Scene 0)
+      // Pages 2-31: Scenes 1-15 (x2 pages each) = 30 pages
+      // Page 32: Back Cover (Scene 16)
+
+      const missingScenes = [];
+      if (!storyPlan.scenes[0].imageUrl) missingScenes.push("Front Cover");
+      for (let i = 1; i <= 15; i++) {
+        if (!storyPlan.scenes[i].imageUrl) missingScenes.push(`Scene ${i}`);
+      }
+      if (!storyPlan.scenes[16].imageUrl) missingScenes.push("Back Cover");
+
+      if (missingScenes.length > 0) {
+        setErrorMessage(uiLanguage === 'French'
+          ? "Impossible de générer le PDF : certaines pages sont manquantes. Veuillez générer toutes les scènes."
+          : "Cannot generate PDF: some pages are missing. Please generate all scenes first.");
+        setLoading(false);
+        return;
+      }
+
       // Index 0: Cover with Logo
       if (storyPlan.scenes[0].imageUrl) {
         doc.addImage(storyPlan.scenes[0].imageUrl, 'PNG', 0, 0, 1024, 1024);
@@ -1246,7 +1269,8 @@ const App: React.FC = () => {
       }
 
       // Index 16: Back Cover with Logo
-      doc.addPage([1024, 1024]);
+      // FIX: Do NOT add a blank page before the back cover. 
+      // The previous loop ends adding the last scene page. The NEXT page is the back cover.
       doc.addPage([1024, 1024]);
       if (storyPlan.scenes[16].imageUrl) {
         doc.addImage(storyPlan.scenes[16].imageUrl, 'PNG', 0, 0, 1024, 1024);
