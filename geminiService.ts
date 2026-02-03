@@ -97,6 +97,11 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 
     PROMPT GENERATION RULE: In the 'prompt' field for scenes, YOU MUST NOT use the names of the characters (like '${input.name}'). Instead, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple", or "reference photo". The AI image generator does not know the names.
     
+    MISSING REFERENCE PHOTO RULE: If a new character is mentioned or required by the story/theme but NO reference photo is provided for them in the inputs:
+    1. STRICTLY LIMIT their presence. Do NOT make them a main part of the scene.
+    2. NARRATIVE: Refer to them in the third person or indirectly (e.g. "The shopkeeper smiled" instead of a full dialogue).
+    3. VISUAL PROMPTS: Describe them generically (e.g. "a silhouette", "background figure", "a friend seen from behind") and ENSURE they are NOT the focal point. Do NOT provide specific facial features for them.
+    
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
     2. An array of 17 components:
@@ -112,7 +117,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. LAYOUT RULE: Create a detailed, beautiful, and uncluttered background at the top (top 25%) and bottom (bottom 25%) to allow for text placement. DO NOT leave white or blank bars; fill the space with sky, ground, or atmospheric elements. The action and characters must be vertically centered. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use bold, fancy, textured, and decorative typography for the title. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background (such as clear sky, soft ground, or a uniform texture). This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene so that there is ample negative space available for the text. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
@@ -135,7 +140,18 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 16 (BACK COVER):
     - Summary of the book (in ${input.language}).
     - Title of the book mentioned.
-    - Prompt follows the Front Cover logic but is a "closing scene".
+    - PROMPT INSTRUCTION:
+      "Design a clean, elegant Back Cover.
+      COMPOSITION:
+      - TOP 30% area: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture) to ensure text readability.
+      - MIDDLE 50% area: The main characters (Front View) looking at the camera, waving goodbye or smiling warmly.
+      - BOTTOM 20% area: Reserved for BRANDING text. Background must be uncluttered.
+      
+      TEXT INSTRUCTION:
+      1. AT THE TOP CENTER: Place the Story Synopsis. Use a readable font.
+      2. AT THE BOTTOM CENTER: Place the text 'Chez Livre Magique, nous faisons de votre enfant le héros de son propre conte.' (in a small, elegant font).
+      
+      NO LOGO/QR CODE: Do not include any logo or QR code placeholders."
     - CRITICAL: Characters MUST BE FACING THE CAMERA (Front View).
     
     CRITICAL: All content within 'synopsis', 'title', 'storyText', and 'HEADLINE TEXT' must be written in ${input.language}.
@@ -205,7 +221,8 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
 
 
 
-  if (logoBase64) {
+  // LOGO LOGIC: Only add logo if it's NOT the back cover
+  if (logoBase64 && scene.type !== 'back-cover') {
     parts.push({
       inlineData: {
         mimeType: 'image/png',
