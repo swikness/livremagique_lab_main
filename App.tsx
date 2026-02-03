@@ -891,6 +891,69 @@ const App: React.FC = () => {
     }
   };
 
+  const verifyAndFixScene = async (index: number): Promise<boolean> => {
+    if (!storyPlan) return false;
+    let currentScenes = [...storyPlan.scenes];
+    let scene = currentScenes[index];
+
+    // Only verify if we have an image
+    if (!scene.imageUrl) return false;
+
+    // We check the image that will be printed.
+    // If split, we check the panoramic before split? Or check 1:1s?
+    // validateBookSpread is designed for the panoramic/spread.
+    // If we have splitImages, we should check the source panoramic (which is in history or imageUrl?).
+    // scene.imageUrl should hold the panoramic/source.
+
+    console.log(`Verifying Scene ${index}...`);
+    try {
+      // 1. Validate
+      const validation = await validateBookSpread(scene.imageUrl);
+
+      if (validation.isValid) {
+        console.log(`Scene ${index} is valid.`);
+        return true;
+      }
+
+      console.warn(`Scene ${index} Invalid: ${validation.reason}. Attempting fix...`);
+
+      // 2. Fix attempt (Max 1 retry for now to be safe)
+      const isCover = index === 0 || index === 16;
+      const retryPrompt = `${scene.prompt} REPAIR INSTRUCTION: ${validation.retryInstruction}. Ensure text is NOT cut off and faces are visible.`;
+
+      // Temporary object to generate with new prompt
+      const tempScene = { ...scene, prompt: retryPrompt };
+
+      const newImage = await generateSceneImage(
+        tempScene,
+        userInput.style,
+        userInput.photoBase64,
+        userInput.partnerPhotoBase64,
+        isCover ? (logoBase64 || undefined) : undefined
+      );
+
+      // 3. Update Scene with fixed image
+      scene.imageUrl = newImage;
+      addToHistory(scene, newImage);
+
+      // If it's a scene (1-15), we need to re-split it
+      if (index >= 1 && index <= 15) {
+        const croppedPanoromic = await autoCropToRatio(newImage, 2);
+        const [left, right] = await splitImage(croppedPanoromic);
+        scene.splitImages = [left, right];
+        scene.aspectRatio = '2:1';
+      }
+
+      currentScenes[index] = scene;
+      setStoryPlan({ ...storyPlan, scenes: currentScenes }); // Update UI
+      return true;
+
+    } catch (e) {
+      console.error(`Fix failed for scene ${index}`, e);
+      return false;
+    }
+  };
+
   const handleUltimateFlow = async () => {
     if (!storyPlan) return;
     setUltimateProgress(1);
@@ -956,6 +1019,14 @@ const App: React.FC = () => {
       }
 
       setStoryPlan({ ...storyPlan, scenes: newScenes });
+
+      // Step 3: Auto-Review & Fix (All scenes 0-16)
+      // We do this serially to avoid overwhelming and better logging
+      for (let i = 0; i <= 16; i++) {
+        await verifyAndFixScene(i);
+        updateProg(); // We can add "Verification" to progress total or just reuse slot
+      }
+
       setUltimateProgress(100);
 
       // Step 3: Download PDF

@@ -145,15 +145,15 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     - PROMPT INSTRUCTION:
       "Design a clean, elegant Back Cover.
       COMPOSITION:
-      - TOP AREA: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture) to ensure text readability.
+      - TOP AREA: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture).
       - CENTER AREA: The main characters (Front View) looking at the camera, waving goodbye or smiling warmly.
-      - BOTTOM AREA: Reserved for a unique BRAND MESSAGE for this story. Background must be uncluttered.
+      - BOTTOM AREA: Reserved for the BRAND MESSAGE. Background must be uncluttered.
       
       TEXT INSTRUCTION:
-      1. AT THE TOP: Place the Story Synopsis. Use a readable font.
-      2. AT THE BOTTOM: Place a short, meaningful concluding sentence relevant to the specific story (e.g. about eternal love, friendship, or the journey ahead). DO NOT use generic or childish text if this is a story for lovers.
+      1. AT THE TOP: Render this EXACT Synopsis text: \"[Insert the generated Synopsis here]\"
+      2. AT THE BOTTOM: Render this EXACT Brand Message: \"[Insert the generated Brand Message here]\"
       
-      NO LOGO/QR CODE: Do not include any logo or QR code placeholders."
+      CRITICAL: You MUST write the actual synopsis text and brand message text in the image. Do not use placeholders."
     - CRITICAL: Characters MUST BE FACING THE CAMERA (Front View).
     
     CRITICAL: All content within 'synopsis', 'title', 'storyText', and 'HEADLINE TEXT' must be written in ${input.language}.
@@ -345,7 +345,8 @@ export const validateBookSpread = async (imageUrl: string): Promise<{ isValid: b
     CHECK FOR FATAL FLAWS:
     1. FOLD SAFETY: Is a character's face or a crucial text element located exactly on the vertical center line? (e.g., cut in half by the spine).
     2. CROP SAFETY: Are the main characters' heads or key text elements cut off at the top, bottom, or side edges?
-    3. COMPOSITION: Is the image mainly empty or broken?
+    3. TEXT INTEGRITY: Is any text on the page cut off, incomplete, or illegible due to low contrast?
+    4. COMPOSITION: Is the image mainly empty or broken?
 
     Return a JSON object:
     {
