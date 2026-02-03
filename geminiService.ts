@@ -114,12 +114,12 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
-      1. IF Theme is '10 Reasons to Love You': Title MUST be "10 RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
+      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
       2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background (such as clear sky, soft ground, or a uniform texture). This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene so that there is ample negative space available for the text. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: Leave a small clear area at the bottom center for the book logo. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-15 (STORY SCENES):
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
@@ -127,15 +127,15 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
       COMPOSITION RULE: STRICT SIDE-BY-SIDE LAYOUT.
       - You MUST choose ONE of these two layouts for this scene:
-          Option A: [Characters on LEFT 40%] + [Uncluttered Background on RIGHT 60% for Text]
-          Option B: [Characters on RIGHT 40%] + [Uncluttered Background on LEFT 60% for Text]
+          Option A: [Characters on LEFT side] + [Uncluttered Background on RIGHT side for Text]
+          Option B: [Characters on RIGHT side] + [Uncluttered Background on LEFT side for Text]
       - CENTER SAFETY: The exact vertical center (50%) is the book spine. Do NOT place important faces or text here.
       - TEXT AREA: The 'Uncluttered Background' must be a seamless part of the scene (e.g., open sky, blurry wall, distant landscape). DO NOT use plain white/black.
       
-      CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave 10-15% margin around the characters' heads and arms. Do NOT cut them off at the edge.
+      CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave margin around the characters' heads and arms. Do NOT cut them off at the edge.
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
-      TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area. CRITICAL: The text block must be at least 15% away from the EXACT VERTICAL CENTER (spine) and 10% away from the outer edges to avoid cut-off. Center the text block vertically within the available space.
+      TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area. CRITICAL: The text block must be away from the EXACT VERTICAL CENTER (spine) and the outer edges to avoid cut-off. Center the text block vertically within the available space.
       TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a SIMPLE, CLEAN, STANDARD FONT (like Serif or Sans-Serif) that is highly readable. Do NOT use cursive, handwriting, or fancy decorative fonts. The font style must be consistent across all scenes.
       TEXT: [STORY_TEXT]"
 
@@ -145,13 +145,13 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     - PROMPT INSTRUCTION:
       "Design a clean, elegant Back Cover.
       COMPOSITION:
-      - TOP 30% area: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture) to ensure text readability.
-      - MIDDLE 50% area: The main characters (Front View) looking at the camera, waving goodbye or smiling warmly.
-      - BOTTOM 20% area: Reserved for BRANDING text. Background must be uncluttered.
+      - TOP AREA: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture) to ensure text readability.
+      - CENTER AREA: The main characters (Front View) looking at the camera, waving goodbye or smiling warmly.
+      - BOTTOM AREA: Reserved for a unique BRAND MESSAGE for this story. Background must be uncluttered.
       
       TEXT INSTRUCTION:
-      1. AT THE TOP CENTER: Place the Story Synopsis. Use a readable font.
-      2. AT THE BOTTOM CENTER: Place the text 'Chez Livre Magique, nous faisons de votre enfant le héros de son propre conte.' (in a small, elegant font).
+      1. AT THE TOP: Place the Story Synopsis. Use a readable font.
+      2. AT THE BOTTOM: Place a short, meaningful concluding sentence relevant to the specific story (e.g. about eternal love, friendship, or the journey ahead). DO NOT use generic or childish text if this is a story for lovers.
       
       NO LOGO/QR CODE: Do not include any logo or QR code placeholders."
     - CRITICAL: Characters MUST BE FACING THE CAMERA (Front View).
