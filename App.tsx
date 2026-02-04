@@ -1260,21 +1260,14 @@ const App: React.FC = () => {
   const handleDownloadPDF = async (format: 'PAGES' | 'SPREADS' = 'PAGES') => {
     if (!storyPlan) return;
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'px',
-      format: [1024, 1024]
+      format: [1024, 576]
     });
     const isRTL = userInput.language === 'Arabic';
     setLoading(true);
     try {
-      // VALIDATION: Check if all 17 scenes (0-16) generally have data
-      // For PDF generation, we specifically need the images to form the pages.
-      // SPREADS mode needs 17 images.
-      // PAGES mode needs 32 pages total:
-      // Page 1: Front Cover (Scene 0)
-      // Pages 2-31: Scenes 1-15 (x2 pages each) = 30 pages
-      // Page 32: Back Cover (Scene 16)
-
+      // VALIDATION: Check for Front (0), Back (16) and Scenes 1-15
       const missingScenes = [];
       if (!storyPlan.scenes[0].imageUrl) missingScenes.push("Front Cover");
       for (let i = 1; i <= 15; i++) {
@@ -1284,70 +1277,83 @@ const App: React.FC = () => {
 
       if (missingScenes.length > 0) {
         setErrorMessage(uiLanguage === 'French'
-          ? "Impossible de générer le PDF : certaines pages sont manquantes. Veuillez générer toutes les scènes."
+          ? "Impossible de générer le PDF : certaines pages sont manquantes."
           : "Cannot generate PDF: some pages are missing. Please generate all scenes first.");
         setLoading(false);
         return;
       }
 
-      // Index 0: Cover with Logo
-      if (storyPlan.scenes[0].imageUrl) {
-        doc.addImage(storyPlan.scenes[0].imageUrl, 'PNG', 0, 0, 1024, 1024);
-      }
+      // --- PAGE 1: COVER SPREAD (Back + Front) ---
+      // We create a single 2:1 image containing both covers.
+      // Dimensions: 2048 x 1024 (approx, based on 1024x1024 covers) -> Scaled to PDF (1024x576 approx ratio?)
+      // Wait, 16:9 is 1024x576. 
+      // Two 1:1 covers side-by-side is 2:1 ratio (e.g. 2048x1024).
+      // 16:9 is 1.77. 2:1 is 2.0.
+      // So the cover spread will be wider than 16:9. We can fit it or let it be 2:1.
+      // Let's make the first page 2:1 (landscape partial) or just use the same page size and fit?
+      // User wanted: "16 pages all 16:9". 
+      // If we force 2:1 cover spread into 16:9 page, we have bars on top/bottom.
+      // Or we can just set the PDF page size for Page 1 to be 2:1?
+      // Let's stick to 16:9 page size (1024x576) for consistency, and "fit" the cover spread (which might letterbox slightly), 
+      // OR we can crop? Covers shouldn't be cropped.
+      // Let's make the canvas 2048x1024 (2:1), then add it to PDF.
+      // JS PDF allows different page sizes? Yes.
+      // But user said "all 16:9". 
+      // If I put two squares (1:1) side by side, that's 2:1. 
+      // How to fit 2:1 into 16:9? resizing.
+      // Let's create the spread image first, then add it.
 
-      // Scenes 1-15 
-      for (let i = 1; i <= 15; i++) {
-        const scene = storyPlan.scenes[i];
+      const coverCanvas = document.createElement('canvas');
+      coverCanvas.width = 2048;
+      coverCanvas.height = 1024;
+      const ctx = coverCanvas.getContext('2d');
+      if (ctx) {
+        const frontImg = await createImage(storyPlan.scenes[0].imageUrl!);
+        const backImg = await createImage(storyPlan.scenes[16].imageUrl!);
 
-        if (format === 'SPREADS') {
-          // Raw 16:9 Image (or whatever ratio it is)
-          if (scene.imageUrl) {
-            doc.addPage([1024, 576]); // approx 16:9 landscape
-            doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 576);
-          } else {
-            doc.addPage([1024, 576]);
-          }
+        if (isRTL) {
+          // RTL: Front (Right) | Back (Left) -> Viewers open from right.
+          // Usually cover spread for RTL: Back Cover is on LEFT, Front Cover is on RIGHT?
+          // No, physical book: Book Face up. Spines on Right. 
+          // Front Cover is Front. Back Cover is Back.
+          // When laid flat (spread): Back Cover -- Spine -- Front Cover.
+          // This is TRUE for LTR (Spine Left) AND RTL (Spine Right)?
+          // Let's visualize.
+          // LTR Book: Spine left. Front cover is right of spine. Back is left of spine. Spread: [Back][Front]
+          // RTL Book: Spine right. Front cover is left of spine. Back is right of spine. Spread: [Front][Back]
+          ctx.drawImage(frontImg, 0, 0, 1024, 1024); // Left
+          ctx.drawImage(backImg, 1024, 0, 1024, 1024); // Right
         } else {
-          // PAGES mode (Split 1:1)
-          let left, right;
+          // LTR: Back (Left) | Front (Right)
+          ctx.drawImage(backImg, 0, 0, 1024, 1024);
+          ctx.drawImage(frontImg, 1024, 0, 1024, 1024);
+        }
+      }
+      const spreadData = coverCanvas.toDataURL('image/jpeg', 0.95);
 
-          if (scene.splitImages) {
-            [left, right] = scene.splitImages;
-          } else if (scene.imageUrl) {
-            // Auto-split if not already split
-            try {
-              const [l, r] = await splitImage(scene.imageUrl);
-              left = l;
-              right = r;
-            } catch (e) {
-              console.error("Auto-split failed for PDF", e);
-              left = scene.imageUrl; // Fallback
-              right = scene.imageUrl;
-            }
-          }
+      // Add Page 1 (Cover Spread)
+      // We use 2048x1024 ratio (2:1) for this specific page to look best, OR force 16:9.
+      // User said "16 pages all 16:9". 
+      // If I force 2:1 image into 16:9 (1024x576), it will distort or crop?
+      // doc definition says format: [1024, 576]. 
+      // Let's add the image. jsPDF will scale if we tell it dimensions.
+      // 1024 width. Height for 2:1 is 512. 
+      // So we center it vertically? 
+      // (576 - 512) / 2 = 32px padding top/bottom.
+      // This preserves aspect ratio.
+      doc.addImage(spreadData, 'JPEG', 0, 32, 1024, 512);
 
-          if (left && right) {
-            doc.addPage([1024, 1024]);
-            doc.addImage(isRTL ? right : left, 'PNG', 0, 0, 1024, 1024);
-            doc.addPage([1024, 1024]);
-            doc.addImage(isRTL ? left : right, 'PNG', 0, 0, 1024, 1024);
-          } else {
-            // Fallback blank pages if no image
-            doc.addPage([1024, 1024]);
-            doc.addPage([1024, 1024]);
-          }
+      // --- PAGES 2-16: SCENES 1-15 (16:9) ---
+      for (let i = 1; i <= 15; i++) {
+        doc.addPage([1024, 576]);
+        const scene = storyPlan.scenes[i];
+        if (scene.imageUrl) {
+          // Ideally image is 16:9. If not, we fit it.
+          doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 576);
         }
       }
 
-      // Index 16: Back Cover with Logo
-      // FIX: Do NOT add a blank page before the back cover. 
-      // The previous loop ends adding the last scene page. The NEXT page is the back cover.
-      doc.addPage([1024, 1024]);
-      if (storyPlan.scenes[16].imageUrl) {
-        doc.addImage(storyPlan.scenes[16].imageUrl, 'PNG', 0, 0, 1024, 1024);
-      }
-
-      doc.save(`${userInput.name}-Magical-Book.pdf`);
+      doc.save(`${userInput.name}-Magical-Book-16Pages.pdf`);
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to generate PDF.");
@@ -1441,7 +1447,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.12
+          v1.0.13
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1836,7 +1842,7 @@ const App: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => handleDownloadPDF('SPREADS')} className="bg-green-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
                     <i className="fas fa-file-pdf"></i>
-                    <span>PDF (17 Imgs)</span>
+                    <span>PDF (16 Pages)</span>
                   </button>
                   <button onClick={() => handleDownloadPDF('PAGES')} className="bg-emerald-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-xl shadow-emerald-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
                     <i className="fab fa-google-drive"></i>
