@@ -180,6 +180,69 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   };
 };
 
+export const generateCoverPlan = async (input: UserInput): Promise<Scene> => {
+  const genAI = getFreshAI();
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3-pro-preview',
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: SchemaType.OBJECT,
+        properties: {
+          title: { type: SchemaType.STRING },
+          prompt: { type: SchemaType.STRING }
+        },
+        required: ["title", "prompt"]
+      }
+    }
+  });
+
+  const char1Info = `${input.name} (Age: ${input.age}, Gender: ${input.gender})`;
+  const char2Info = input.audience === TargetAudience.LOVERS ? ` and ${input.partnerName} (Age: ${input.partnerAge}, Gender: ${input.partnerGender})` : '';
+  const mainCharacterContext = input.audience === TargetAudience.LOVERS
+    ? `Main Characters (A Couple): ${char1Info}${char2Info}.`
+    : `Main Character: ${char1Info}.`;
+
+  const prompt = `
+    You are a professional book cover designer.
+    Generate a Front Cover plan for a ${input.audience} book.
+    ${mainCharacterContext}
+    Story Concept: ${input.theme}
+    Visual Style: ${input.style}
+    Target Language for Title: ${input.language}
+
+    RULES FOR FRONT COVER:
+    - Title must reflect the relationship if it's a couple.
+    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type (if known, otherwise invent a magical title):
+      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
+      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title if it's a Lovers book.
+    
+    Generate a prompt using this template:
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
+
+    Return JSON format: { "title": "...", "prompt": "..." }
+  `;
+
+  console.log(`Generating Cover Plan...`);
+  const result = await model.generateContent(prompt);
+  const raw = JSON.parse(result.response.text() || '{}');
+
+  return {
+    id: 0,
+    type: 'front-cover',
+    title: raw.title,
+    description: "Front Cover",
+    prompt: raw.prompt,
+    storyText: "",
+    history: [],
+    status: 'idle',
+    aspectRatio: '1:1',
+    generationRatio: '1:1'
+  };
+};
+
 export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, mainCharacterPhoto?: string, partnerPhoto?: string, logoBase64?: string, isRandomize: boolean = false): Promise<string> => {
   const genAI = getFreshAI();
   const activeStyle = scene.overrideStyle || baseStyle;

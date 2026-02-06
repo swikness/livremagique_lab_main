@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
 
 const LOGO_PATH = '/logo.png';
-import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread } from './geminiService';
+import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
 
 
 const THEME_OPTIONS = [
@@ -335,6 +335,12 @@ const App: React.FC = () => {
   const isPausedRef = useRef(false);
   const stopGenerationRef = useRef(false);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
+
+  // Quick Cover State
+  const [quickCoverModalOpen, setQuickCoverModalOpen] = useState(false);
+  const [quickCoverScene, setQuickCoverScene] = useState<Scene | null>(null);
+  const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
+  const [quickCoverLoading, setQuickCoverLoading] = useState(false);
 
   // Sync ref with state
   useEffect(() => {
@@ -748,6 +754,57 @@ const App: React.FC = () => {
       setErrorMessage(error.message || "Failed to generate story plan.");
     } finally {
       setLoading(false);
+    }
+
+  };
+
+  const handleQuickCoverGen = async (newPrompt: boolean = true) => {
+    const missing = [];
+    if (!userInput.name.trim()) missing.push(t.name);
+    if (!userInput.photoBase64) missing.push(t.uploadPhoto);
+
+    if (userInput.audience === TargetAudience.LOVERS) {
+      if (!userInput.partnerName?.trim()) missing.push(t.partnerIdentity + " " + t.name);
+      if (!userInput.partnerPhotoBase64) missing.push(t.partnerIdentity + " Photo");
+      if (!loversStoryType) missing.push("Story Type");
+    }
+
+    if (missing.length > 0) {
+      setErrorMessage(`Required: ${missing.join(', ')}`);
+      return;
+    }
+
+    setQuickCoverLoading(true);
+    try {
+      let sceneToUse = quickCoverScene;
+
+      // Generate new prompt if requested or if none exists
+      if (newPrompt || !sceneToUse) {
+        sceneToUse = await generateCoverPlan({ ...userInput, style: quickCoverStyle });
+      }
+
+      // Generate Image
+      // Note: generateSceneImage expects a scene. We pass the chosen style explicitly.
+      const img = await generateSceneImage(
+        sceneToUse!,
+        quickCoverStyle,
+        userInput.photoBase64,
+        userInput.partnerPhotoBase64,
+        logoBase64 || undefined
+      );
+
+      setQuickCoverScene({ ...sceneToUse!, imageUrl: img, status: 'done' });
+    } catch (e: any) {
+      console.error(e);
+      setErrorMessage(e.message || "Quick Cover Failed");
+    } finally {
+      setQuickCoverLoading(false);
+    }
+  };
+
+  const handleQuickCoverDownload = () => {
+    if (quickCoverScene?.imageUrl) {
+      downloadImageWithLogo(quickCoverScene.imageUrl, `${userInput.name}-QuickCover.png`, true);
     }
   };
 
@@ -1445,9 +1502,88 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Quick Cover Modal */}
+      {quickCoverModalOpen && (
+        <div className="fixed inset-0 z-[250] bg-black/95 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-slate-900 rounded-3xl border border-amber-400/30 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center">
+              <h3 className="text-amber-400 font-bold uppercase tracking-widest flex items-center gap-2">
+                <i className="fas fa-bolt"></i> Quick Cover Generator
+              </h3>
+              <button onClick={() => setQuickCoverModalOpen(false)} className="text-slate-500 hover:text-white">
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="space-y-1 flex-1 w-full">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.artStyle}</label>
+                  <select
+                    value={quickCoverStyle}
+                    onChange={(e) => setQuickCoverStyle(e.target.value as StoryStyle)}
+                    className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 outline-none font-bold text-xs text-white"
+                  >
+                    {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.REALISTIC, StoryStyle.VECTOR_ART].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => handleQuickCoverGen(false)}
+                  disabled={quickCoverLoading}
+                  className="px-6 py-3 bg-amber-400 text-slate-950 rounded-xl font-bold uppercase text-xs hover:bg-amber-500 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {quickCoverLoading ? <i className="fas fa-spinner animate-spin"></i> : <i className="fas fa-magic"></i>}
+                  Generate
+                </button>
+              </div>
+
+              {/* Preview Area */}
+              <div className="aspect-square bg-black rounded-2xl border border-slate-800 overflow-hidden relative group">
+                {quickCoverScene?.imageUrl ? (
+                  <img src={quickCoverScene.imageUrl} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-700">
+                    <i className="fas fa-image text-5xl mb-3 opacity-30"></i>
+                    <p className="uppercase font-bold text-xs">Ready to Generate</p>
+                  </div>
+                )}
+
+                {quickCoverLoading && (
+                  <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+                    <i className="fas fa-spinner animate-spin text-amber-400 text-3xl mb-2"></i>
+                    <span className="text-amber-400 font-bold uppercase text-xs tracking-widest">Generating Cover...</span>
+                  </div>
+                )}
+
+                {quickCoverScene?.imageUrl && !quickCoverLoading && (
+                  <div className="absolute inset-x-0 bottom-0 p-4 bg-slate-900/80 backdrop-blur flex justify-between items-center translate-y-full group-hover:translate-y-0 transition-transform">
+                    <span className="text-[10px] text-white font-bold truncate max-w-[200px]">{quickCoverScene.title}</span>
+                    <button onClick={handleQuickCoverDownload} className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-[10px] uppercase hover:bg-slate-200">
+                      <i className="fas fa-download mr-1"></i> Download
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt Display (Optional) */}
+              {quickCoverScene?.prompt && (
+                <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                  <p className="text-[9px] text-slate-500 font-mono leading-relaxed line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+                    {quickCoverScene.prompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.13
+          v1.0.14
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1750,6 +1886,14 @@ const App: React.FC = () => {
               <button disabled={loading} onClick={handleGeneratePlan} className="group px-16 py-5 bg-amber-400 text-slate-950 font-bold rounded-full hover:bg-amber-500 transition-all shadow-xl shadow-amber-400/20 text-lg uppercase tracking-widest flex items-center gap-4 mx-auto disabled:opacity-50">
                 {loading ? <i className="fas fa-spinner animate-spin"></i> : storyPlan ? <><i className="fas fa-sync"></i> Update Changes</> : <><i className="fas fa-magic"></i> {t.generateSynopsis}</>}
               </button>
+
+
+              {/* Quick Cover Button */}
+              <div className="mt-4 flex justify-center">
+                <button onClick={() => { setQuickCoverModalOpen(true); setQuickCoverStyle(userInput.style); }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                  <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
+                </button>
+              </div>
             </div>
           </div>
         )}
