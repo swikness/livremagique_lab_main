@@ -72,4 +72,5 @@ export interface UserInput {
   extras: ExtraAsset[];
   language: string;
   wordsPerScene: number;
+  yearsCount?: string;
 }

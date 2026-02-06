@@ -341,6 +341,7 @@ const App: React.FC = () => {
   const [quickCoverScene, setQuickCoverScene] = useState<Scene | null>(null);
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
   const [quickCoverLoversType, setQuickCoverLoversType] = useState<string>('10_REASONS');
+  const [quickCoverYears, setQuickCoverYears] = useState<string>('2');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
 
   // Sync ref with state
@@ -796,18 +797,19 @@ const App: React.FC = () => {
         sceneToUse = await generateCoverPlan({
           ...userInput,
           theme: effectiveTheme,
-          style: quickCoverStyle
+          style: quickCoverStyle,
+          yearsCount: quickCoverYears
         });
       }
 
       // Generate Image
-      // Note: generateSceneImage expects a scene. We pass the chosen style explicitly.
+      // Note: generateSceneImage - we pass undefined for logoBase64 to keep quick preview clean as requested
       const img = await generateSceneImage(
         sceneToUse!,
         quickCoverStyle,
         userInput.photoBase64,
         userInput.partnerPhotoBase64,
-        logoBase64 || undefined
+        undefined
       );
 
       setQuickCoverScene({ ...sceneToUse!, imageUrl: img, status: 'done' });
@@ -1563,6 +1565,19 @@ const App: React.FC = () => {
                     </select>
                   </div>
                 )}
+                {/* Years Selector (Only for LOVE_STORY) */}
+                {(userInput.audience === TargetAudience.LOVERS || userInput.audience === 'Lovers') && quickCoverLoversType === 'LOVE_STORY' && (
+                  <div className="space-y-1 w-24">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
+                    <select
+                      value={quickCoverYears}
+                      onChange={(e) => setQuickCoverYears(e.target.value)}
+                      className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 outline-none font-bold text-xs text-white"
+                    >
+                      {yearsCountOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                )}
                 <button
                   onClick={() => handleQuickCoverGen(false)}
                   disabled={quickCoverLoading}
@@ -1616,7 +1631,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.15
+          v1.0.16
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1926,10 +1941,14 @@ const App: React.FC = () => {
                 <button onClick={() => {
                   setQuickCoverModalOpen(true);
                   setQuickCoverStyle(userInput.style);
-                  if (loversStoryType) setQuickCoverLoversType(loversStoryType);
-                }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
-                  <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
-                </button>
+                  <button onClick={() => {
+                    setQuickCoverModalOpen(true);
+                    setQuickCoverStyle(userInput.style);
+                    if (loversStoryType) setQuickCoverLoversType(loversStoryType);
+                    if (selectedYearsCount) setQuickCoverYears(selectedYearsCount);
+                  }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                    <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
+                  </button>
               </div>
             </div>
           </div>

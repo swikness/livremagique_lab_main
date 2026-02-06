@@ -215,7 +215,7 @@ export const generateCoverPlan = async (input: UserInput): Promise<Scene> => {
     - Title must reflect the relationship if it's a couple.
     - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type (if known, otherwise invent a magical title):
       1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
-      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${input.yearsCount || '2'} ANS D'AMOUR DEJA" (or similar relevant duration).
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title if it's a Lovers book.
     
