@@ -340,6 +340,7 @@ const App: React.FC = () => {
   const [quickCoverModalOpen, setQuickCoverModalOpen] = useState(false);
   const [quickCoverScene, setQuickCoverScene] = useState<Scene | null>(null);
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
+  const [quickCoverLoversType, setQuickCoverLoversType] = useState<string>('10_REASONS');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
 
   // Sync ref with state
@@ -778,9 +779,25 @@ const App: React.FC = () => {
     try {
       let sceneToUse = quickCoverScene;
 
+      // Determine theme based on audience and dropdown
+      let effectiveTheme = userInput.theme;
+      if (userInput.audience === TargetAudience.LOVERS) {
+        // Map internal types to strings expected by geminiService prompts
+        switch (quickCoverLoversType) {
+          case '10_REASONS': effectiveTheme = '10 Reasons to Love You'; break;
+          case 'LOVE_STORY': effectiveTheme = 'Our Love Story'; break;
+          case 'BUCKET_LIST': effectiveTheme = 'Bucket List'; break;
+          default: effectiveTheme = '10 Reasons to Love You';
+        }
+      }
+
       // Generate new prompt if requested or if none exists
       if (newPrompt || !sceneToUse) {
-        sceneToUse = await generateCoverPlan({ ...userInput, style: quickCoverStyle });
+        sceneToUse = await generateCoverPlan({
+          ...userInput,
+          theme: effectiveTheme,
+          style: quickCoverStyle
+        });
       }
 
       // Generate Image
@@ -1530,6 +1547,22 @@ const App: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                {/* Lovers Title Template Selector */}
+                {(userInput.audience === TargetAudience.LOVERS || userInput.audience === 'Lovers') && (
+                  <div className="space-y-1 flex-1 w-full">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Title Template</label>
+                    <select
+                      value={quickCoverLoversType}
+                      onChange={(e) => setQuickCoverLoversType(e.target.value)}
+                      className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 outline-none font-bold text-xs text-white"
+                    >
+                      <option value="10_REASONS">10 Reasons Why</option>
+                      <option value="LOVE_STORY">Our Love Story</option>
+                      <option value="BUCKET_LIST">Bucket List</option>
+                    </select>
+                  </div>
+                )}
                 <button
                   onClick={() => handleQuickCoverGen(false)}
                   disabled={quickCoverLoading}
@@ -1583,7 +1616,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.14
+          v1.0.15
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1890,7 +1923,11 @@ const App: React.FC = () => {
 
               {/* Quick Cover Button */}
               <div className="mt-4 flex justify-center">
-                <button onClick={() => { setQuickCoverModalOpen(true); setQuickCoverStyle(userInput.style); }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                <button onClick={() => {
+                  setQuickCoverModalOpen(true);
+                  setQuickCoverStyle(userInput.style);
+                  if (loversStoryType) setQuickCoverLoversType(loversStoryType);
+                }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
                   <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
                 </button>
               </div>
