@@ -1631,7 +1631,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.16
+          v1.0.17
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1941,14 +1941,11 @@ const App: React.FC = () => {
                 <button onClick={() => {
                   setQuickCoverModalOpen(true);
                   setQuickCoverStyle(userInput.style);
-                  <button onClick={() => {
-                    setQuickCoverModalOpen(true);
-                    setQuickCoverStyle(userInput.style);
-                    if (loversStoryType) setQuickCoverLoversType(loversStoryType);
-                    if (selectedYearsCount) setQuickCoverYears(selectedYearsCount);
-                  }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
-                    <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
-                  </button>
+                  if (loversStoryType) setQuickCoverLoversType(loversStoryType);
+                  if (selectedYearsCount) setQuickCoverYears(selectedYearsCount);
+                }} className="px-6 py-3 rounded-full border border-slate-700 text-slate-400 hover:text-white hover:border-amber-400 hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                  <i className="fas fa-bolt text-amber-400"></i> Quick Cover Preview
+                </button>
               </div>
             </div>
           </div>
