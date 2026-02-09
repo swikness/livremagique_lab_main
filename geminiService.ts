@@ -180,7 +180,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   };
 };
 
-export const generateCoverPlan = async (input: UserInput): Promise<Scene> => {
+export const generateCoverPlan = async (input: UserInput, customInstructions?: string): Promise<Scene> => {
   const genAI = getFreshAI();
   const model = genAI.getGenerativeModel({
     model: 'gemini-3-pro-preview',
@@ -203,6 +203,8 @@ export const generateCoverPlan = async (input: UserInput): Promise<Scene> => {
     ? `Main Characters (A Couple): ${char1Info}${char2Info}.`
     : `Main Character: ${char1Info}.`;
 
+  const customInstructionText = customInstructions ? `\n\nADDITIONAL CUSTOM INSTRUCTIONS: ${customInstructions}. You MUST incorporate these instructions into the cover design.` : '';
+
   const prompt = `
     You are a professional book cover designer.
     Generate a Front Cover plan for a ${input.audience} book.
@@ -210,6 +212,7 @@ export const generateCoverPlan = async (input: UserInput): Promise<Scene> => {
     Story Concept: ${input.theme}
     Visual Style: ${input.style}
     Target Language for Title: ${input.language}
+    ${customInstructionText}
 
     RULES FOR FRONT COVER:
     - Title must reflect the relationship if it's a couple.
