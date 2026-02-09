@@ -76,6 +76,8 @@ const TRANSLATIONS = {
     book1Title: (name: string, gender: string) => `Livre 1 : "Raisons pour lesquelles je l'aime (${gender === 'HER' ? 'Elle' : 'Lui'}), ${name || '[Nom]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Livre 2 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : ${years} Ans d'Amour"`,
     book3Title: (n1: string, n2: string) => `Livre 3 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : Notre Liste de Rêves"`,
+    storyTypeOptions: "Options Type d'Histoire",
+    customInstructions: "Instructions Personnalisées (Optionnel)",
   },
   English: {
     appTitle: "Magical Book Lab",
@@ -130,6 +132,8 @@ const TRANSLATIONS = {
     book1Title: (name: string, gender: string) => `Book 1: "Reasons why I love ${gender === 'HER' ? 'HER' : 'HIM'}, ${name || '[Name]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Book 2: "${n1 || '[Him]'} & ${n2 || '[Her]'} : ${years} Years of Love"`,
     book3Title: (n1: string, n2: string) => `Book 3: "${n1 || '[Him]'} & ${n2 || '[Her]'} : Our Bucket List"`,
+    storyTypeOptions: "Story Type Options",
+    customInstructions: "Custom Instructions (Optional)",
   }
 };
 
@@ -287,6 +291,7 @@ const App: React.FC = () => {
     wordsPerScene: 15
   });
   const [loversStoryType, setLoversStoryType] = useState<LoversStoryType>(null);
+  const [loversOptionsExpanded, setLoversOptionsExpanded] = useState(false);
   const [recipientType, setRecipientType] = useState<RecipientType>('HER');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [customOption, setCustomOption] = useState<string>('');
@@ -1525,7 +1530,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.18
+          v1.0.19
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
@@ -1659,117 +1664,132 @@ const App: React.FC = () => {
                   {userInput.audience === TargetAudience.LOVERS ? (
                     <div className="space-y-4 animate-in fade-in duration-300">
 
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
-                            className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                          >
-                            <i className="fas fa-female"></i> {t.toHer}
-                          </button>
-                          <button
-                            onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
-                            className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                          >
-                            <i className="fas fa-male"></i> {t.toHim}
-                          </button>
-                        </div>
-                      </div>
+                      {/* Collapsible Story Type Options */}
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setLoversOptionsExpanded(!loversOptionsExpanded)}
+                          className="w-full p-3 rounded-xl border border-slate-700 text-slate-400 hover:border-pink-400 hover:text-pink-400 transition-all flex items-center justify-between"
+                        >
+                          <span className="text-xs font-bold uppercase tracking-widest">{t.storyTypeOptions}</span>
+                          <i className={`fas fa-${loversOptionsExpanded ? 'minus' : 'plus'}`}></i>
+                        </button>
 
-                      <div className="grid grid-cols-1 gap-2">
-                        <button
-                          onClick={() => { setLoversStoryType('10_REASONS'); setSelectedOptions([]); setCustomOption(''); }}
-                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === '10_REASONS' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                        >
-                          <i className="fas fa-list-ol"></i>
-                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book1Title(userInput.partnerName, recipientType)}</span>
-                        </button>
-                        <button
-                          onClick={() => { setLoversStoryType('LOVE_STORY'); setSelectedOptions([]); setCustomOption(''); }}
-                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'LOVE_STORY' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                        >
-                          <i className="fas fa-heart"></i>
-                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book2Title(userInput.name, userInput.partnerName, selectedYearsCount)}</span>
-                        </button>
-                        <button
-                          onClick={() => { setLoversStoryType('BUCKET_LIST'); setSelectedOptions([]); setCustomOption(''); }}
-                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'BUCKET_LIST' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                        >
-                          <i className="fas fa-star"></i>
-                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book3Title(userInput.name, userInput.partnerName)}</span>
-                        </button>
-                      </div>
-
-                      {loversStoryType && (
-                        <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50 animate-in slide-in-from-top duration-300">
-                          {loversStoryType === 'LOVE_STORY' && (
-                            <div className="space-y-1 mb-2">
-                              <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
-                              <select
-                                value={selectedYearsCount}
-                                onChange={(e) => setSelectedYearsCount(e.target.value)}
-                                className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs font-bold uppercase"
-                              >
-                                {yearsCountOptions.map(y => <option key={y} value={y} className="bg-slate-900">{y} {t.ans}</option>)}
-                              </select>
+                        {loversOptionsExpanded && (
+                          <div className="space-y-3 animate-in slide-in-from-top duration-300">
+                            <div className="space-y-2">
+                              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
+                                  className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                >
+                                  <i className="fas fa-female"></i> {t.toHer}
+                                </button>
+                                <button
+                                  onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
+                                  className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                >
+                                  <i className="fas fa-male"></i> {t.toHim}
+                                </button>
+                              </div>
                             </div>
-                          )}
 
-                          <div className="flex justify-between items-center px-1">
-                            <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                              {t.chooseOptions}
-                            </h5>
-                            <span className={`text-[10px] font-bold ${selectedOptions.length === 15 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 15</span>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                            {selectedOptions.filter(opt => !getStoryTypeOptions().includes(opt)).map((opt, idx) => (
+                            <div className="grid grid-cols-1 gap-2">
                               <button
-                                key={`custom-${idx}`}
-                                onClick={() => toggleLoversOption(opt)}
-                                className="text-left p-3 rounded-xl text-xs transition-all border bg-pink-600 border-pink-600 text-white font-bold flex justify-between items-center"
+                                onClick={() => { setLoversStoryType('10_REASONS'); setSelectedOptions([]); setCustomOption(''); }}
+                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === '10_REASONS' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                               >
-                                <span>{opt}</span>
-                                <i className="fas fa-check-circle"></i>
+                                <i className="fas fa-list-ol"></i>
+                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book1Title(userInput.partnerName, recipientType)}</span>
                               </button>
-                            ))}
-                            {getStoryTypeOptions().map((opt, idx) => (
                               <button
-                                key={idx}
-                                onClick={() => toggleLoversOption(opt)}
-                                className={`text-left p-3 rounded-xl text-xs transition-all border flex justify-between items-center ${selectedOptions.includes(opt) ? 'bg-pink-500 border-pink-500 text-white font-bold' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'}`}
+                                onClick={() => { setLoversStoryType('LOVE_STORY'); setSelectedOptions([]); setCustomOption(''); }}
+                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'LOVE_STORY' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                               >
-                                <span>{opt}</span>
-                                {selectedOptions.includes(opt) && <i className="fas fa-check-circle"></i>}
+                                <i className="fas fa-heart"></i>
+                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book2Title(userInput.name, userInput.partnerName, selectedYearsCount)}</span>
                               </button>
-                            ))}
-                          </div>
-
-                          <div className="space-y-1.5 pt-2 border-t border-slate-700/50">
-                            <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
-                            <div className="relative">
-                              <input
-                                value={customOption}
-                                onChange={(e) => setCustomOption(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
-                                className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
-                                placeholder={
-                                  loversStoryType === '10_REASONS' ? t.placeholderReasons :
-                                    loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
-                                      t.placeholderBucket
-                                }
-                              />
                               <button
-                                onClick={handleAddCustomOption}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
+                                onClick={() => { setLoversStoryType('BUCKET_LIST'); setSelectedOptions([]); setCustomOption(''); }}
+                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'BUCKET_LIST' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                               >
-                                <i className="fas fa-check"></i>
+                                <i className="fas fa-star"></i>
+                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book3Title(userInput.name, userInput.partnerName)}</span>
                               </button>
                             </div>
+
+                            {loversStoryType && (
+                              <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50 animate-in slide-in-from-top duration-300">
+                                {loversStoryType === 'LOVE_STORY' && (
+                                  <div className="space-y-1 mb-2">
+                                    <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
+                                    <select
+                                      value={selectedYearsCount}
+                                      onChange={(e) => setSelectedYearsCount(e.target.value)}
+                                      className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs font-bold uppercase"
+                                    >
+                                      {yearsCountOptions.map(y => <option key={y} value={y} className="bg-slate-900">{y} {t.ans}</option>)}
+                                    </select>
+                                  </div>
+                                )}
+
+                                <div className="flex justify-between items-center px-1">
+                                  <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                    {t.chooseOptions}
+                                  </h5>
+                                  <span className={`text-[10px] font-bold ${selectedOptions.length === 15 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 15</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                  {selectedOptions.filter(opt => !getStoryTypeOptions().includes(opt)).map((opt, idx) => (
+                                    <button
+                                      key={`custom-${idx}`}
+                                      onClick={() => toggleLoversOption(opt)}
+                                      className="text-left p-3 rounded-xl text-xs transition-all border bg-pink-600 border-pink-600 text-white font-bold flex justify-between items-center"
+                                    >
+                                      <span>{opt}</span>
+                                      <i className="fas fa-check-circle"></i>
+                                    </button>
+                                  ))}
+                                  {getStoryTypeOptions().map((opt, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => toggleLoversOption(opt)}
+                                      className={`text-left p-3 rounded-xl text-xs transition-all border flex justify-between items-center ${selectedOptions.includes(opt) ? 'bg-pink-500 border-pink-500 text-white font-bold' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'}`}
+                                    >
+                                      <span>{opt}</span>
+                                      {selectedOptions.includes(opt) && <i className="fas fa-check-circle"></i>}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <div className="space-y-1.5 pt-2 border-t border-slate-700/50">
+                                  <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
+                                  <div className="relative">
+                                    <input
+                                      value={customOption}
+                                      onChange={(e) => setCustomOption(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
+                                      className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
+                                      placeholder={
+                                        loversStoryType === '10_REASONS' ? t.placeholderReasons :
+                                          loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
+                                            t.placeholderBucket
+                                      }
+                                    />
+                                    <button
+                                      onClick={handleAddCustomOption}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
+                                    >
+                                      <i className="fas fa-check"></i>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -1798,10 +1818,10 @@ const App: React.FC = () => {
                 <div className="space-y-3">
                   <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.artStyle}</label>
                   <div className="grid grid-cols-1 gap-2">
-                    {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.REALISTIC, StoryStyle.VECTOR_ART].map(s => (
+                    {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.VECTOR_ART].map(s => (
                       <button key={s} onClick={() => setUserInput(p => ({ ...p, style: s }))} className={`p-3 rounded-xl border text-left flex items-center gap-4 transition-all ${userInput.style === s ? 'border-amber-400 bg-amber-400/10 text-amber-400' : 'border-slate-700 text-slate-500'}`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${userInput.style === s ? 'bg-amber-400 text-slate-950' : 'bg-slate-800'}`}>
-                          <i className={`fas ${s === StoryStyle.SEMI_REALISTIC ? 'fa-brush' : s === StoryStyle.ANIMATION_3D ? 'fa-wand-sparkles' : s === StoryStyle.REALISTIC ? 'fa-camera' : 'fa-bezier-curve'}`}></i>
+                          <i className={`fas ${s === StoryStyle.SEMI_REALISTIC ? 'fa-brush' : s === StoryStyle.ANIMATION_3D ? 'fa-wand-sparkles' : 'fa-bezier-curve'}`}></i>
                         </div>
                         <div className="font-bold text-xs uppercase tracking-widest">{s}</div>
                       </button>
@@ -1856,14 +1876,14 @@ const App: React.FC = () => {
                         onChange={(e) => setQuickCoverStyle(e.target.value as StoryStyle)}
                         className="w-full bg-slate-800 p-3 rounded-xl border border-slate-700 outline-none font-bold text-xs text-white"
                       >
-                        {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.REALISTIC, StoryStyle.VECTOR_ART].map(s => (
+                        {[StoryStyle.ANIMATION_3D, StoryStyle.SEMI_REALISTIC, StoryStyle.VECTOR_ART].map(s => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Custom Instructions (Optional)</label>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.customInstructions}</label>
                       <input
                         value={quickCoverCustomInstructions}
                         onChange={(e) => setQuickCoverCustomInstructions(e.target.value)}
