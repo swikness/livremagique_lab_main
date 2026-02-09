@@ -1664,62 +1664,63 @@ const App: React.FC = () => {
                   {userInput.audience === TargetAudience.LOVERS ? (
                     <div className="space-y-4 animate-in fade-in duration-300">
 
-                      {/* Collapsible Story Type Options */}
-                      <div className="space-y-2">
+                      {/* Title Selection - Always Visible */}
+                      <div className="grid grid-cols-1 gap-2">
                         <button
-                          onClick={() => setLoversOptionsExpanded(!loversOptionsExpanded)}
-                          className="w-full p-3 rounded-xl border border-slate-700 text-slate-400 hover:border-pink-400 hover:text-pink-400 transition-all flex items-center justify-between"
+                          onClick={() => { setLoversStoryType('10_REASONS'); setSelectedOptions([]); setCustomOption(''); }}
+                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === '10_REASONS' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
                         >
-                          <span className="text-xs font-bold uppercase tracking-widest">{t.storyTypeOptions}</span>
-                          <i className={`fas fa-${loversOptionsExpanded ? 'minus' : 'plus'}`}></i>
+                          <i className="fas fa-list-ol"></i>
+                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book1Title(userInput.partnerName, recipientType)}</span>
                         </button>
+                        <button
+                          onClick={() => { setLoversStoryType('LOVE_STORY'); setSelectedOptions([]); setCustomOption(''); }}
+                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'LOVE_STORY' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
+                        >
+                          <i className="fas fa-heart"></i>
+                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book2Title(userInput.name, userInput.partnerName, selectedYearsCount)}</span>
+                        </button>
+                        <button
+                          onClick={() => { setLoversStoryType('BUCKET_LIST'); setSelectedOptions([]); setCustomOption(''); }}
+                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'BUCKET_LIST' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
+                        >
+                          <i className="fas fa-star"></i>
+                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book3Title(userInput.name, userInput.partnerName)}</span>
+                        </button>
+                      </div>
 
-                        {loversOptionsExpanded && (
-                          <div className="space-y-3 animate-in slide-in-from-top duration-300">
-                            <div className="space-y-2">
-                              <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
-                                  className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                                >
-                                  <i className="fas fa-female"></i> {t.toHer}
-                                </button>
-                                <button
-                                  onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
-                                  className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                                >
-                                  <i className="fas fa-male"></i> {t.toHim}
-                                </button>
+                      {/* Collapsible Detailed Options - Only shown if a story type is selected */}
+                      {loversStoryType && (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setLoversOptionsExpanded(!loversOptionsExpanded)}
+                            className="w-full p-3 rounded-xl border border-slate-700 text-slate-400 hover:border-pink-400 hover:text-pink-400 transition-all flex items-center justify-between"
+                          >
+                            <span className="text-xs font-bold uppercase tracking-widest">{t.storyTypeOptions}</span>
+                            <i className={`fas fa-${loversOptionsExpanded ? 'minus' : 'plus'}`}></i>
+                          </button>
+
+                          {loversOptionsExpanded && (
+                            <div className="space-y-3 animate-in slide-in-from-top duration-300">
+                              <div className="space-y-2">
+                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
+                                    className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                  >
+                                    <i className="fas fa-female"></i> {t.toHer}
+                                  </button>
+                                  <button
+                                    onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
+                                    className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                  >
+                                    <i className="fas fa-male"></i> {t.toHim}
+                                  </button>
+                                </div>
                               </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 gap-2">
-                              <button
-                                onClick={() => { setLoversStoryType('10_REASONS'); setSelectedOptions([]); setCustomOption(''); }}
-                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === '10_REASONS' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                              >
-                                <i className="fas fa-list-ol"></i>
-                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book1Title(userInput.partnerName, recipientType)}</span>
-                              </button>
-                              <button
-                                onClick={() => { setLoversStoryType('LOVE_STORY'); setSelectedOptions([]); setCustomOption(''); }}
-                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'LOVE_STORY' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                              >
-                                <i className="fas fa-heart"></i>
-                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book2Title(userInput.name, userInput.partnerName, selectedYearsCount)}</span>
-                              </button>
-                              <button
-                                onClick={() => { setLoversStoryType('BUCKET_LIST'); setSelectedOptions([]); setCustomOption(''); }}
-                                className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'BUCKET_LIST' ? 'border-pink-500 bg-pink-500/10 text-pink-400' : 'border-slate-700 text-slate-500'}`}
-                              >
-                                <i className="fas fa-star"></i>
-                                <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book3Title(userInput.name, userInput.partnerName)}</span>
-                              </button>
-                            </div>
-
-                            {loversStoryType && (
-                              <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50 animate-in slide-in-from-top duration-300">
+                              <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50">
                                 {loversStoryType === 'LOVE_STORY' && (
                                   <div className="space-y-1 mb-2">
                                     <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
@@ -1786,10 +1787,10 @@ const App: React.FC = () => {
                                   </div>
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
