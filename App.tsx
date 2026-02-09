@@ -19,7 +19,7 @@ const THEME_OPTIONS = [
 
 const LANGUAGES = ["French", "Arabic", "English", "Spanish"];
 
-type LoversStoryType = '10_REASONS' | 'LOVE_STORY' | 'BUCKET_LIST' | null;
+type LoversStoryType = '10_REASONS' | 'LOVE_STORY' | 'BUCKET_LIST' | 'CUSTOM_STORY' | null;
 type RecipientType = 'HIM' | 'HER';
 
 const TRANSLATIONS = {
@@ -76,6 +76,11 @@ const TRANSLATIONS = {
     book1Title: (name: string, gender: string) => `Livre 1 : "Raisons pour lesquelles je l'aime (${gender === 'HER' ? 'Elle' : 'Lui'}), ${name || '[Nom]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Livre 2 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : ${years} Ans d'Amour"`,
     book3Title: (n1: string, n2: string) => `Livre 3 : "${n1 || '[Lui]'} & ${n2 || '[Elle]'} : Notre Liste de Rêves"`,
+    book4Title: "Livre 4 : \"Histoire Personnalisée\"",
+    customStoryTitle: "Titre du Livre",
+    customStorySynopsis: "Synopsis de l'Histoire",
+    customTitlePlaceholder: "Entrez le titre de votre livre...",
+    customSynopsisPlaceholder: "Décrivez votre histoire en quelques phrases...",
     storyTypeOptions: "Options Type d'Histoire",
     customInstructions: "Instructions Personnalisées (Optionnel)",
   },
@@ -132,6 +137,11 @@ const TRANSLATIONS = {
     book1Title: (name: string, gender: string) => `Book 1: "Reasons why I love ${gender === 'HER' ? 'HER' : 'HIM'}, ${name || '[Name]'}"`,
     book2Title: (n1: string, n2: string, years: string) => `Book 2: "${n1 || '[Him]'} & ${n2 || '[Her]'} : ${years} Years of Love"`,
     book3Title: (n1: string, n2: string) => `Book 3: "${n1 || '[Him]'} & ${n2 || '[Her]'} : Our Bucket List"`,
+    book4Title: "Book 4: \"Custom Story\"",
+    customStoryTitle: "Book Title",
+    customStorySynopsis: "Story Synopsis",
+    customTitlePlaceholder: "Enter your book title...",
+    customSynopsisPlaceholder: "Describe your story in a few sentences...",
     storyTypeOptions: "Story Type Options",
     customInstructions: "Custom Instructions (Optional)",
   }
@@ -296,6 +306,8 @@ const App: React.FC = () => {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [customOption, setCustomOption] = useState<string>('');
   const [selectedYearsCount, setSelectedYearsCount] = useState<string>('2');
+  const [customStoryTitle, setCustomStoryTitle] = useState<string>('');
+  const [customStorySynopsis, setCustomStorySynopsis] = useState<string>('');
 
   const [storyPlan, setStoryPlan] = useState<StoryPlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -735,7 +747,14 @@ const App: React.FC = () => {
       if (!userInput.partnerPhotoBase64) missing.push(t.partnerIdentity + " Photo");
       if (!loversStoryType) missing.push("Story Type");
 
-      if (selectedOptions.length === 0) {
+      if (loversStoryType === 'CUSTOM_STORY') {
+        // Custom story requires title and synopsis
+        if (!customStoryTitle.trim()) missing.push(t.customStoryTitle);
+        if (!customStorySynopsis.trim()) missing.push(t.customStorySynopsis);
+        if (missing.length === 0) {
+          finalTheme = `Story Type: CUSTOM_STORY. Book Title: "${customStoryTitle}". Story Synopsis: "${customStorySynopsis}". This is a personalized love story book where the cover and all illustrations must visually represent the title and synopsis provided. The cover should clearly convey the story concept through its visuals.`;
+        }
+      } else if (selectedOptions.length === 0) {
         missing.push("Selections (min 1)");
       } else {
         const context = loversStoryType === 'LOVE_STORY' ? ` Specifically covering ${selectedYearsCount} years of love.` : '';
@@ -774,6 +793,10 @@ const App: React.FC = () => {
       if (!userInput.partnerName?.trim()) missing.push(t.partnerIdentity + " " + t.name);
       if (!userInput.partnerPhotoBase64) missing.push(t.partnerIdentity + " Photo");
       if (!loversStoryType) missing.push("Story Type");
+      if (loversStoryType === 'CUSTOM_STORY') {
+        if (!customStoryTitle.trim()) missing.push(t.customStoryTitle);
+        if (!customStorySynopsis.trim()) missing.push(t.customStorySynopsis);
+      }
     } else {
       // For Kids/Adults, require a theme
       if (!userInput.theme.trim()) missing.push(t.storyBlueprint);
@@ -796,6 +819,7 @@ const App: React.FC = () => {
           case '10_REASONS': effectiveTheme = '10 Reasons to Love You'; break;
           case 'LOVE_STORY': effectiveTheme = 'Our Love Story'; break;
           case 'BUCKET_LIST': effectiveTheme = 'Bucket List'; break;
+          case 'CUSTOM_STORY': effectiveTheme = `Custom Story: "${customStoryTitle}". Synopsis: ${customStorySynopsis}. The cover must visually represent this story concept.`; break;
           default: effectiveTheme = '10 Reasons to Love You';
         }
       }
@@ -1687,107 +1711,140 @@ const App: React.FC = () => {
                           <i className="fas fa-star"></i>
                           <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book3Title(userInput.name, userInput.partnerName)}</span>
                         </button>
+                        <button
+                          onClick={() => { setLoversStoryType('CUSTOM_STORY'); setSelectedOptions([]); setCustomOption(''); }}
+                          className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${loversStoryType === 'CUSTOM_STORY' ? 'border-purple-500 bg-purple-500/10 text-purple-400' : 'border-slate-700 text-slate-500'}`}
+                        >
+                          <i className="fas fa-feather-alt"></i>
+                          <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.book4Title}</span>
+                        </button>
                       </div>
 
                       {/* Collapsible Detailed Options - Only shown if a story type is selected */}
                       {loversStoryType && (
                         <div className="space-y-2">
-                          <button
-                            onClick={() => setLoversOptionsExpanded(!loversOptionsExpanded)}
-                            className="w-full p-3 rounded-xl border border-slate-700 text-slate-400 hover:border-pink-400 hover:text-pink-400 transition-all flex items-center justify-between"
-                          >
-                            <span className="text-xs font-bold uppercase tracking-widest">{t.storyTypeOptions}</span>
-                            <i className={`fas fa-${loversOptionsExpanded ? 'minus' : 'plus'}`}></i>
-                          </button>
-
-                          {loversOptionsExpanded && (
-                            <div className="space-y-3 animate-in slide-in-from-top duration-300">
-                              <div className="space-y-2">
-                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
-                                    className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                                  >
-                                    <i className="fas fa-female"></i> {t.toHer}
-                                  </button>
-                                  <button
-                                    onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
-                                    className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
-                                  >
-                                    <i className="fas fa-male"></i> {t.toHim}
-                                  </button>
-                                </div>
+                          {/* Custom Story: Show title and synopsis inputs directly */}
+                          {loversStoryType === 'CUSTOM_STORY' ? (
+                            <div className="space-y-4 bg-purple-900/10 p-4 rounded-2xl border border-purple-500/30 animate-in slide-in-from-top duration-300">
+                              <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-purple-400 ml-1">{t.customStoryTitle}</label>
+                                <input
+                                  value={customStoryTitle}
+                                  onChange={(e) => setCustomStoryTitle(e.target.value)}
+                                  className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-purple-400 outline-none text-sm font-bold"
+                                  placeholder={t.customTitlePlaceholder}
+                                />
                               </div>
-
-                              <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50">
-                                {loversStoryType === 'LOVE_STORY' && (
-                                  <div className="space-y-1 mb-2">
-                                    <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
-                                    <select
-                                      value={selectedYearsCount}
-                                      onChange={(e) => setSelectedYearsCount(e.target.value)}
-                                      className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs font-bold uppercase"
-                                    >
-                                      {yearsCountOptions.map(y => <option key={y} value={y} className="bg-slate-900">{y} {t.ans}</option>)}
-                                    </select>
-                                  </div>
-                                )}
-
-                                <div className="flex justify-between items-center px-1">
-                                  <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                                    {t.chooseOptions}
-                                  </h5>
-                                  <span className={`text-[10px] font-bold ${selectedOptions.length === 15 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 15</span>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                                  {selectedOptions.filter(opt => !getStoryTypeOptions().includes(opt)).map((opt, idx) => (
-                                    <button
-                                      key={`custom-${idx}`}
-                                      onClick={() => toggleLoversOption(opt)}
-                                      className="text-left p-3 rounded-xl text-xs transition-all border bg-pink-600 border-pink-600 text-white font-bold flex justify-between items-center"
-                                    >
-                                      <span>{opt}</span>
-                                      <i className="fas fa-check-circle"></i>
-                                    </button>
-                                  ))}
-                                  {getStoryTypeOptions().map((opt, idx) => (
-                                    <button
-                                      key={idx}
-                                      onClick={() => toggleLoversOption(opt)}
-                                      className={`text-left p-3 rounded-xl text-xs transition-all border flex justify-between items-center ${selectedOptions.includes(opt) ? 'bg-pink-500 border-pink-500 text-white font-bold' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'}`}
-                                    >
-                                      <span>{opt}</span>
-                                      {selectedOptions.includes(opt) && <i className="fas fa-check-circle"></i>}
-                                    </button>
-                                  ))}
-                                </div>
-
-                                <div className="space-y-1.5 pt-2 border-t border-slate-700/50">
-                                  <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
-                                  <div className="relative">
-                                    <input
-                                      value={customOption}
-                                      onChange={(e) => setCustomOption(e.target.value)}
-                                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
-                                      className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
-                                      placeholder={
-                                        loversStoryType === '10_REASONS' ? t.placeholderReasons :
-                                          loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
-                                            t.placeholderBucket
-                                      }
-                                    />
-                                    <button
-                                      onClick={handleAddCustomOption}
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
-                                    >
-                                      <i className="fas fa-check"></i>
-                                    </button>
-                                  </div>
-                                </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-purple-400 ml-1">{t.customStorySynopsis}</label>
+                                <textarea
+                                  value={customStorySynopsis}
+                                  onChange={(e) => setCustomStorySynopsis(e.target.value)}
+                                  className="w-full h-32 bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-purple-400 outline-none text-xs resize-none"
+                                  placeholder={t.customSynopsisPlaceholder}
+                                />
                               </div>
                             </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setLoversOptionsExpanded(!loversOptionsExpanded)}
+                                className="w-full p-3 rounded-xl border border-slate-700 text-slate-400 hover:border-pink-400 hover:text-pink-400 transition-all flex items-center justify-between"
+                              >
+                                <span className="text-xs font-bold uppercase tracking-widest">{t.storyTypeOptions}</span>
+                                <i className={`fas fa-${loversOptionsExpanded ? 'minus' : 'plus'}`}></i>
+                              </button>
+
+                              {loversOptionsExpanded && (
+                                <div className="space-y-3 animate-in slide-in-from-top duration-300">
+                                  <div className="space-y-2">
+                                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.offeredTo}</label>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => { setRecipientType('HER'); setSelectedOptions([]); }}
+                                        className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HER' ? 'bg-pink-500 border-pink-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                      >
+                                        <i className="fas fa-female"></i> {t.toHer}
+                                      </button>
+                                      <button
+                                        onClick={() => { setRecipientType('HIM'); setSelectedOptions([]); }}
+                                        className={`flex-1 py-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${recipientType === 'HIM' ? 'bg-blue-500 border-blue-500 text-white shadow-lg' : 'bg-slate-800/50 border-slate-700 text-slate-400'}`}
+                                      >
+                                        <i className="fas fa-male"></i> {t.toHim}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-700/50">
+                                    {loversStoryType === 'LOVE_STORY' && (
+                                      <div className="space-y-1 mb-2">
+                                        <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.yearsOfLove}</label>
+                                        <select
+                                          value={selectedYearsCount}
+                                          onChange={(e) => setSelectedYearsCount(e.target.value)}
+                                          className="w-full bg-slate-900/50 p-3 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs font-bold uppercase"
+                                        >
+                                          {yearsCountOptions.map(y => <option key={y} value={y} className="bg-slate-900">{y} {t.ans}</option>)}
+                                        </select>
+                                      </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center px-1">
+                                      <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                        {t.chooseOptions}
+                                      </h5>
+                                      <span className={`text-[10px] font-bold ${selectedOptions.length === 15 ? 'text-red-400' : 'text-pink-500'}`}>{selectedOptions.length} / 15</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                      {selectedOptions.filter(opt => !getStoryTypeOptions().includes(opt)).map((opt, idx) => (
+                                        <button
+                                          key={`custom-${idx}`}
+                                          onClick={() => toggleLoversOption(opt)}
+                                          className="text-left p-3 rounded-xl text-xs transition-all border bg-pink-600 border-pink-600 text-white font-bold flex justify-between items-center"
+                                        >
+                                          <span>{opt}</span>
+                                          <i className="fas fa-check-circle"></i>
+                                        </button>
+                                      ))}
+                                      {getStoryTypeOptions().map((opt, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => toggleLoversOption(opt)}
+                                          className={`text-left p-3 rounded-xl text-xs transition-all border flex justify-between items-center ${selectedOptions.includes(opt) ? 'bg-pink-500 border-pink-500 text-white font-bold' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600'}`}
+                                        >
+                                          <span>{opt}</span>
+                                          {selectedOptions.includes(opt) && <i className="fas fa-check-circle"></i>}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    <div className="space-y-1.5 pt-2 border-t border-slate-700/50">
+                                      <label className="text-[9px] uppercase font-bold text-slate-500 ml-1">{t.customOption}</label>
+                                      <div className="relative">
+                                        <input
+                                          value={customOption}
+                                          onChange={(e) => setCustomOption(e.target.value)}
+                                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCustomOption())}
+                                          className="w-full bg-slate-900/50 p-3 pr-12 rounded-xl border border-slate-800 focus:border-pink-400 outline-none text-xs"
+                                          placeholder={
+                                            loversStoryType === '10_REASONS' ? t.placeholderReasons :
+                                              loversStoryType === 'LOVE_STORY' ? t.placeholderStory :
+                                                t.placeholderBucket
+                                          }
+                                        />
+                                        <button
+                                          onClick={handleAddCustomOption}
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors"
+                                        >
+                                          <i className="fas fa-check"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       )}

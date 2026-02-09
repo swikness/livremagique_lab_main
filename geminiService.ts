@@ -35,7 +35,6 @@ export const getCustomApiKey = () => {
 
 const STYLE_DESCRIPTIONS = {
   [StoryStyle.SEMI_REALISTIC]: "semi-realistic digital painting, high-quality concept art, illustrative style, painterly textures, natural facial proportions, cinematic lighting, atmospheric depth, soft detailed shading, dramatic composition, ArtStation trending, fantasy realism, no cartoon features, no 3D render.",
-  [StoryStyle.REALISTIC]: "ultra-realistic photography style, 8k resolution, highly detailed, cinematic lighting, photorealistic characters, depth of field, sharp focus, professional photography, Fujifilm GFX 100, natural skin textures, volumetric lighting.",
   [StoryStyle.ANIMATION_3D]: "3D animation style, Pixar inspired, C4D, Octane Render, cinematic lighting, volumetric atmosphere, hyper-detailed textures, 8k, masterpiece, ray-tracing, soft studio lighting, magical realism, vibrant colors, sharp focus. CHARACTER CONSISTENCY: The characters MUST look exactly like the reference photos in every single frame.",
   [StoryStyle.VECTOR_ART]: "modern commercial vector illustration, 2D flat design with soft gradient shading, cute avatar style, big head small body proportions, vibrant saturated colors, clean sharp edges, smooth vector gradients, romantic cartoon, playful and expressive, highly polished digital art. CHARACTER CONSISTENCY: Maintain exact facial features and hair style from the reference photos in a vector style."
 };
@@ -220,10 +219,17 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
       1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
       2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${input.yearsCount || '2'} ANS D'AMOUR DEJA" (or similar relevant duration).
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
+      4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Extract the Book Title from the theme and use it as the cover title. The visual composition MUST directly represent the synopsis provided - include specific visual elements, settings, and atmosphere that tell the story just from looking at the cover.
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title if it's a Lovers book.
     
+    SPECIAL INSTRUCTIONS FOR CUSTOM STORIES:
+    - If the theme mentions "Custom Story" or "Synopsis:", you MUST analyze the synopsis and create a cover that VISUALLY TELLS THE STORY.
+    - The cover composition, background, character poses, outfits, and props MUST all reflect the story concept from the synopsis.
+    - A viewer should be able to understand what the story is about just by looking at the cover visuals.
+    - Be creative with the setting, lighting, and atmosphere to match the story mood.
+    
     Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition that VISUALLY REPRESENTS the story concept]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     Return JSON format: { "title": "...", "prompt": "..." }
   `;
