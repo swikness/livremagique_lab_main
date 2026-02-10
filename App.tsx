@@ -1364,11 +1364,6 @@ const App: React.FC = () => {
 
   const handleDownloadPDF = async (format: 'PAGES' | 'SPREADS' = 'PAGES') => {
     if (!storyPlan) return;
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'px',
-      format: [1024, 576]
-    });
     const isRTL = userInput.language === 'Arabic';
     setLoading(true);
     try {
@@ -1388,77 +1383,103 @@ const App: React.FC = () => {
         return;
       }
 
-      // --- PAGE 1: COVER SPREAD (Back + Front) ---
-      // We create a single 2:1 image containing both covers.
-      // Dimensions: 2048 x 1024 (approx, based on 1024x1024 covers) -> Scaled to PDF (1024x576 approx ratio?)
-      // Wait, 16:9 is 1024x576. 
-      // Two 1:1 covers side-by-side is 2:1 ratio (e.g. 2048x1024).
-      // 16:9 is 1.77. 2:1 is 2.0.
-      // So the cover spread will be wider than 16:9. We can fit it or let it be 2:1.
-      // Let's make the first page 2:1 (landscape partial) or just use the same page size and fit?
-      // User wanted: "16 pages all 16:9". 
-      // If we force 2:1 cover spread into 16:9 page, we have bars on top/bottom.
-      // Or we can just set the PDF page size for Page 1 to be 2:1?
-      // Let's stick to 16:9 page size (1024x576) for consistency, and "fit" the cover spread (which might letterbox slightly), 
-      // OR we can crop? Covers shouldn't be cropped.
-      // Let's make the canvas 2048x1024 (2:1), then add it to PDF.
-      // JS PDF allows different page sizes? Yes.
-      // But user said "all 16:9". 
-      // If I put two squares (1:1) side by side, that's 2:1. 
-      // How to fit 2:1 into 16:9? resizing.
-      // Let's create the spread image first, then add it.
-
-      const coverCanvas = document.createElement('canvas');
-      coverCanvas.width = 2048;
-      coverCanvas.height = 1024;
-      const ctx = coverCanvas.getContext('2d');
-      if (ctx) {
-        const frontImg = await createImage(storyPlan.scenes[0].imageUrl!);
-        const backImg = await createImage(storyPlan.scenes[16].imageUrl!);
-
-        if (isRTL) {
-          // RTL: Front (Right) | Back (Left) -> Viewers open from right.
-          // Usually cover spread for RTL: Back Cover is on LEFT, Front Cover is on RIGHT?
-          // No, physical book: Book Face up. Spines on Right. 
-          // Front Cover is Front. Back Cover is Back.
-          // When laid flat (spread): Back Cover -- Spine -- Front Cover.
-          // This is TRUE for LTR (Spine Left) AND RTL (Spine Right)?
-          // Let's visualize.
-          // LTR Book: Spine left. Front cover is right of spine. Back is left of spine. Spread: [Back][Front]
-          // RTL Book: Spine right. Front cover is left of spine. Back is right of spine. Spread: [Front][Back]
-          ctx.drawImage(frontImg, 0, 0, 1024, 1024); // Left
-          ctx.drawImage(backImg, 1024, 0, 1024, 1024); // Right
-        } else {
-          // LTR: Back (Left) | Front (Right)
-          ctx.drawImage(backImg, 0, 0, 1024, 1024);
-          ctx.drawImage(frontImg, 1024, 0, 1024, 1024);
+      if (format === 'PAGES') {
+        // ===== 32-PAGE FORMAT: Individual pages =====
+        // Validate that all scenes 1-15 have been split
+        const unsplitScenes = [];
+        for (let i = 1; i <= 15; i++) {
+          if (!storyPlan.scenes[i].splitImages) unsplitScenes.push(`Scene ${i}`);
         }
-      }
-      const spreadData = coverCanvas.toDataURL('image/jpeg', 0.95);
-
-      // Add Page 1 (Cover Spread)
-      // We use 2048x1024 ratio (2:1) for this specific page to look best, OR force 16:9.
-      // User said "16 pages all 16:9". 
-      // If I force 2:1 image into 16:9 (1024x576), it will distort or crop?
-      // doc definition says format: [1024, 576]. 
-      // Let's add the image. jsPDF will scale if we tell it dimensions.
-      // 1024 width. Height for 2:1 is 512. 
-      // So we center it vertically? 
-      // (576 - 512) / 2 = 32px padding top/bottom.
-      // This preserves aspect ratio.
-      doc.addImage(spreadData, 'JPEG', 0, 32, 1024, 512);
-
-      // --- PAGES 2-16: SCENES 1-15 (16:9) ---
-      for (let i = 1; i <= 15; i++) {
-        doc.addPage([1024, 576]);
-        const scene = storyPlan.scenes[i];
-        if (scene.imageUrl) {
-          // Ideally image is 16:9. If not, we fit it.
-          doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 576);
+        if (unsplitScenes.length > 0) {
+          setErrorMessage(uiLanguage === 'French'
+            ? "Impossible de générer le PDF 32 pages : certaines scènes n'ont pas été divisées. Veuillez diviser toutes les scènes d'abord."
+            : "Cannot generate 32-page PDF: some scenes have not been split. Please split all scenes first.");
+          setLoading(false);
+          return;
         }
-      }
 
-      doc.save(`${userInput.name}-Magical-Book-16Pages.pdf`);
+        // Portrait page for individual pages (covers & split halves)
+        const pageW = 576;
+        const pageH = 1024;
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [pageW, pageH]
+        });
+
+        // Page 1: Front Cover (scene 0) - 1:1 image centered on portrait page
+        const frontCoverImg = storyPlan.scenes[0].imageUrl!;
+        // Fit 1:1 image into portrait page: width = pageW, height = pageW (square), centered vertically
+        const coverSize = pageW;
+        const coverY = (pageH - coverSize) / 2;
+        doc.addImage(frontCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
+
+        // Pages 2-31: Scene split images (2 pages per scene × 15 scenes = 30 pages)
+        for (let i = 1; i <= 15; i++) {
+          const scene = storyPlan.scenes[i];
+          const [leftImg, rightImg] = scene.splitImages!;
+
+          if (isRTL) {
+            // RTL: right page first, then left page
+            doc.addPage([pageW, pageH]);
+            doc.addImage(rightImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addPage([pageW, pageH]);
+            doc.addImage(leftImg, 'JPEG', 0, 0, pageW, pageH);
+          } else {
+            // LTR: left page first, then right page
+            doc.addPage([pageW, pageH]);
+            doc.addImage(leftImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addPage([pageW, pageH]);
+            doc.addImage(rightImg, 'JPEG', 0, 0, pageW, pageH);
+          }
+        }
+
+        // Page 32: Back Cover (scene 16) - 1:1 image centered on portrait page
+        doc.addPage([pageW, pageH]);
+        const backCoverImg = storyPlan.scenes[16].imageUrl!;
+        doc.addImage(backCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
+
+        doc.save(`${userInput.name}-Magical-Book-32Pages.pdf`);
+
+      } else {
+        // ===== 16-PAGE FORMAT: Spreads (original behavior) =====
+        const doc = new jsPDF({
+          orientation: 'landscape',
+          unit: 'px',
+          format: [1024, 576]
+        });
+
+        // PAGE 1: COVER SPREAD (Back + Front)
+        const coverCanvas = document.createElement('canvas');
+        coverCanvas.width = 2048;
+        coverCanvas.height = 1024;
+        const ctx = coverCanvas.getContext('2d');
+        if (ctx) {
+          const frontImg = await createImage(storyPlan.scenes[0].imageUrl!);
+          const backImg = await createImage(storyPlan.scenes[16].imageUrl!);
+
+          if (isRTL) {
+            ctx.drawImage(frontImg, 0, 0, 1024, 1024);
+            ctx.drawImage(backImg, 1024, 0, 1024, 1024);
+          } else {
+            ctx.drawImage(backImg, 0, 0, 1024, 1024);
+            ctx.drawImage(frontImg, 1024, 0, 1024, 1024);
+          }
+        }
+        const spreadData = coverCanvas.toDataURL('image/jpeg', 0.95);
+        doc.addImage(spreadData, 'JPEG', 0, 32, 1024, 512);
+
+        // PAGES 2-16: SCENES 1-15 (16:9)
+        for (let i = 1; i <= 15; i++) {
+          doc.addPage([1024, 576]);
+          const scene = storyPlan.scenes[i];
+          if (scene.imageUrl) {
+            doc.addImage(scene.imageUrl, 'PNG', 0, 0, 1024, 576);
+          }
+        }
+
+        doc.save(`${userInput.name}-Magical-Book-16Pages.pdf`);
+      }
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to generate PDF.");
@@ -1554,7 +1575,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.19
+          v1.0.20
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>
