@@ -1422,15 +1422,15 @@ const App: React.FC = () => {
           if (isRTL) {
             // RTL: right page first, then left page
             doc.addPage([pageW, pageH]);
-            doc.addImage(rightImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addImage(rightImg, 'JPEG', 0, coverY, coverSize, coverSize);
             doc.addPage([pageW, pageH]);
-            doc.addImage(leftImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addImage(leftImg, 'JPEG', 0, coverY, coverSize, coverSize);
           } else {
             // LTR: left page first, then right page
             doc.addPage([pageW, pageH]);
-            doc.addImage(leftImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addImage(leftImg, 'JPEG', 0, coverY, coverSize, coverSize);
             doc.addPage([pageW, pageH]);
-            doc.addImage(rightImg, 'JPEG', 0, 0, pageW, pageH);
+            doc.addImage(rightImg, 'JPEG', 0, coverY, coverSize, coverSize);
           }
         }
 
@@ -1575,7 +1575,7 @@ const App: React.FC = () => {
 
       <header className="mb-10 text-center relative">
         <div className="absolute top-0 left-0 text-slate-600 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded">
-          v1.0.20
+          v1.0.21
         </div>
         <div className="absolute top-0 right-0 flex gap-2">
           <button onClick={() => setUiLanguage('French')} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${uiLanguage === 'French' ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500'}`}>FR</button>

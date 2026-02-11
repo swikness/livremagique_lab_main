@@ -315,22 +315,50 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
   const aspectRatioIntruction = scene.aspectRatio === '1:1' ? 'Aspect Ratio: 1:1 Square' : 'Aspect Ratio: 16:9 Wide';
   const finalPromptWithRatio = `${activeStyle}. ${aspectRatioIntruction}. ${finalPrompt}`;
 
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: finalPromptWithRatio }, ...parts.slice(1)] }]
-    });
+  const maxRetries = 3;
+  let retryCount = 0;
 
-    const candidates = result.response.candidates;
-    if (!candidates || candidates.length === 0) throw new Error("No image data returned.");
+  while (retryCount <= maxRetries) {
+    try {
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: finalPromptWithRatio }, ...parts.slice(1)] }]
+      });
 
-    for (const part of candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
+      const candidates = result.response.candidates;
+      if (!candidates || candidates.length === 0) throw new Error("No image data returned.");
+
+      for (const part of candidates[0].content.parts) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
       }
+    } catch (error: any) {
+      retryCount++;
+      console.warn(`Image generation attempt ${retryCount} failed:`, error.message);
+
+      if (retryCount > maxRetries) {
+        let errorMessage = "Image generation failed.";
+        const msg = error.message || '';
+
+        if (msg.includes('500') || msg.includes('Internal error')) {
+          errorMessage = "Google AI Server Error (500). The service is temporarily overloaded. Please try again in 1 minute.";
+        } else if (msg.includes('429') || msg.includes('quota')) {
+          errorMessage = "Rate Limit Exceeded. You are generating too fast. Please wait 1-2 minutes.";
+        } else if (msg.includes('503') || msg.includes('Overloaded')) {
+          errorMessage = "Model Overloaded (503). Google's servers are busy. Please retry.";
+        } else if (msg.includes('400') && (msg.includes('Image') || msg.includes('payload'))) {
+          errorMessage = "Image Upload Error. Your reference photo might be too large or invalid. Try a smaller photo.";
+        }
+
+        console.error("Final Image Generation Error:", errorMessage, error);
+        throw new Error(errorMessage);
+      }
+
+      // Exponential backoff: 2s, 4s, 8s
+      const waitTime = 2000 * Math.pow(2, retryCount - 1);
+      console.log(`Retrying in ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-  } catch (error) {
-    console.error("Image generation failed:", error);
-    throw error;
   }
 
   throw new Error("No image generated.");
