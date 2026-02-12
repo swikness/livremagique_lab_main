@@ -64,3 +64,57 @@ export async function uploadPdf(pdfBuffer, folderId, fileName) {
 
   return `https://drive.google.com/file/d/${fileId}/view`;
 }
+
+/**
+ * Create a folder inside parentFolderId. Returns the new folder ID.
+ * @param {string} parentFolderId
+ * @param {string} folderName
+ * @returns {Promise<string>} new folder ID
+ */
+export async function createFolder(parentFolderId, folderName) {
+  const auth = getAuth();
+  const drive = google.drive({ version: 'v3', auth });
+  const res = await drive.files.create({
+    requestBody: {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    },
+    supportsAllDrives: true,
+  });
+  const folderId = res.data.id;
+  if (!folderId) throw new Error('Folder create did not return id');
+  return folderId;
+}
+
+/**
+ * Upload an image buffer to a Drive folder. Returns the file view URL.
+ * @param {string} folderId
+ * @param {Buffer} imageBuffer
+ * @param {string} fileName - e.g. "page-01.png"
+ * @param {string} mimeType - e.g. "image/png"
+ * @returns {Promise<string>} view URL
+ */
+export async function uploadImage(folderId, imageBuffer, fileName, mimeType = 'image/png') {
+  const auth = getAuth();
+  const drive = google.drive({ version: 'v3', auth });
+  const res = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: [folderId],
+    },
+    media: {
+      mimeType,
+      body: Readable.from(imageBuffer),
+    },
+    supportsAllDrives: true,
+  });
+  const fileId = res.data.id;
+  if (!fileId) throw new Error('Image upload did not return file id');
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
+  });
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
