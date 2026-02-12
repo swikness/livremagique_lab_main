@@ -6,11 +6,12 @@ import express from 'express';
 import sharp from 'sharp';
 import { google } from 'googleapis';
 import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
-import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
+import { generateStoryPlan, generateSceneImage, verifySceneImage } from './lib/gemini.js';
 import { createFolder, uploadImage } from './lib/drive.js';
 import { callWebhook } from './lib/webhook.js';
 
 const DRIVE_SCOPE = ['https://www.googleapis.com/auth/drive.file'];
+const SCENE_VERIFY_MAX_RETRIES = 3;
 
 function base64ToBuffer(dataUrl) {
   const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -21,6 +22,18 @@ function getMimeFromDataUrl(dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:')) return 'image/png';
   const match = dataUrl.match(/^data:([^;]+);/);
   return (match && match[1]) || 'image/png';
+}
+
+/** Center-crop buffer to square (min(width,height) x min(width,height)). */
+async function cropToSquare(buf) {
+  const meta = await sharp(buf).metadata();
+  const w = meta.width || 1;
+  const h = meta.height || 1;
+  if (w === h) return buf;
+  const size = Math.min(w, h);
+  const left = Math.floor((w - size) / 2);
+  const top = Math.floor((h - size) / 2);
+  return sharp(buf).extract({ left, top, width: size, height: size }).png().toBuffer();
 }
 
 const app = express();
@@ -147,29 +160,41 @@ app.post('/createBook', async (req, res) => {
   }
   const folderUrl = `https://drive.google.com/drive/folders/${bookFolderId}`;
 
-  // 1. Upload cover (page 01)
+  // 1. Upload cover (page 01) — crop to square before upload
   try {
-    const coverBuf = base64ToBuffer(coverBase64);
-    const coverMime = getMimeFromDataUrl(coverBase64);
-    await uploadImage(bookFolderId, coverBuf, 'page-01.png', coverMime);
+    let coverBuf = base64ToBuffer(coverBase64);
+    coverBuf = await cropToSquare(coverBuf);
+    await uploadImage(bookFolderId, coverBuf, 'page-01.png', 'image/png');
   } catch (e) {
     console.error('Upload cover error:', e);
     await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
     return res.status(500).json({ error: 'Cover upload failed: ' + e.message });
   }
 
-  // 2. Scenes 1–15: generate, crop left/right, upload two images each (pages 02–31)
+  // 2. Scenes 1–15: generate (up to 3 retries with verify), crop left/right, crop each to square, upload (pages 02–31)
   for (let i = 1; i <= 15; i++) {
     const scene = plan.scenes[i];
-    try {
-      const imageUrl = await generateSceneImage(scene, style, coverBase64, null, null);
-      scene.imageUrl = imageUrl;
-      scene.aspectRatio = '16:9';
-    } catch (e) {
-      console.error(`generateSceneImage ${i} error:`, e);
-      await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
-      return res.status(500).json({ error: `Image ${i} failed: ` + e.message });
+    let imageUrl = null;
+    for (let attempt = 1; attempt <= SCENE_VERIFY_MAX_RETRIES; attempt++) {
+      try {
+        imageUrl = await generateSceneImage(scene, style, coverBase64, null, null);
+        const ok = await verifySceneImage(imageUrl, coverBase64);
+        if (ok) break;
+        console.warn(`Scene ${i} verify failed (attempt ${attempt}/${SCENE_VERIFY_MAX_RETRIES}), retrying...`);
+      } catch (e) {
+        console.error(`generateSceneImage ${i} attempt ${attempt} error:`, e);
+        if (attempt === SCENE_VERIFY_MAX_RETRIES) {
+          await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
+          return res.status(500).json({ error: `Image ${i} failed: ` + e.message });
+        }
+      }
     }
+    if (!imageUrl) {
+      await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
+      return res.status(500).json({ error: `Image ${i} failed after ${SCENE_VERIFY_MAX_RETRIES} attempts` });
+    }
+    scene.imageUrl = imageUrl;
+    scene.aspectRatio = '16:9';
 
     const sceneBuf = base64ToBuffer(scene.imageUrl);
     const { width, height } = await sharp(sceneBuf).metadata();
@@ -182,6 +207,8 @@ app.post('/createBook', async (req, res) => {
     try {
       leftBuf = await sharp(sceneBuf).extract({ left: 0, top: 0, width: halfW, height: h }).png().toBuffer();
       rightBuf = await sharp(sceneBuf).extract({ left: halfW, top: 0, width: w - halfW, height: h }).png().toBuffer();
+      leftBuf = await cropToSquare(leftBuf);
+      rightBuf = await cropToSquare(rightBuf);
     } catch (e) {
       console.error(`Crop scene ${i} error:`, e);
       await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
@@ -200,20 +227,33 @@ app.post('/createBook', async (req, res) => {
     }
   }
 
-  // 3. Generate and upload back cover (scene 16 → page 32)
+  // 3. Generate and upload back cover (scene 16 → page 32) — up to 3 retries with verify, crop to square, optional logo
   const backScene = plan.scenes[16];
-  try {
-    const backUrl = await generateSceneImage(backScene, style, coverBase64, null, null);
-    backScene.imageUrl = backUrl;
-  } catch (e) {
-    console.error('generateSceneImage back cover error:', e);
-    await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
-    return res.status(500).json({ error: 'Back cover failed: ' + e.message });
+  const backLogoBase64 = row.logoBase64 || null;
+  let backUrl = null;
+  for (let attempt = 1; attempt <= SCENE_VERIFY_MAX_RETRIES; attempt++) {
+    try {
+      backUrl = await generateSceneImage(backScene, style, coverBase64, null, backLogoBase64);
+      const ok = await verifySceneImage(backUrl, coverBase64);
+      if (ok) break;
+      console.warn(`Back cover verify failed (attempt ${attempt}/${SCENE_VERIFY_MAX_RETRIES}), retrying...`);
+    } catch (e) {
+      console.error('generateSceneImage back cover attempt', attempt, 'error:', e);
+      if (attempt === SCENE_VERIFY_MAX_RETRIES) {
+        await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
+        return res.status(500).json({ error: 'Back cover failed: ' + e.message });
+      }
+    }
   }
+  if (!backUrl) {
+    await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
+    return res.status(500).json({ error: 'Back cover failed after ' + SCENE_VERIFY_MAX_RETRIES + ' attempts' });
+  }
+  backScene.imageUrl = backUrl;
   try {
-    const backBuf = base64ToBuffer(backScene.imageUrl);
-    const backMime = getMimeFromDataUrl(backScene.imageUrl);
-    await uploadImage(bookFolderId, backBuf, 'page-32.png', backMime);
+    let backBuf = base64ToBuffer(backScene.imageUrl);
+    backBuf = await cropToSquare(backBuf);
+    await uploadImage(bookFolderId, backBuf, 'page-32.png', 'image/png');
   } catch (e) {
     console.error('Upload back cover error:', e);
     await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
