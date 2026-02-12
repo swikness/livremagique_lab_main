@@ -66,13 +66,13 @@ Visual Style: ${input.style}
 Target Language for ALL TEXT: ${input.language}
 STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
 
-STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters unless explicitly requested.
-PROMPT GENERATION RULE: In the 'prompt' field for scenes, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple" - NOT the names.
+STRICT CHARACTER RULE: The story MUST include ONLY the two main characters (the couple). Do NOT add any other people: no friends, no family, no strangers, no background characters, no extras. Every scene shows only the man and the woman.
+PROMPT GENERATION RULE: In the 'prompt' field for scenes, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple" - NOT the names. Describe ONLY these two characters; never mention or imply other people in the image.
 NARRATIVE PERSONA: Use the Main Character's actual name (${input.name}) in storyText frequently.
 
 Return JSON: synopsis (string) and scenes (array of 17 items). Index 0 = Front Cover, 1-15 = Story scenes, 16 = Back Cover.
 For INDEX 0: title with names ${input.name} and ${input.partnerName}; prompt for cover with STYLE_INSTRUCTION placeholder.
-For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe the scene so that characters and any text are on the LEFT or RIGHT side of the image, never in the center (the image is split down the center for the book spine).
+For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. Describe the scene so that characters and any text are on the LEFT or RIGHT side of the image, never in the center (the image is split down the center for the book spine).
 For INDEX 16: Back cover prompt, synopsis area, characters facing camera.
 All text in ${input.language}. Return JSON only.`;
 
@@ -110,8 +110,8 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
 
   const singleReference = mainCharacterPhoto && !partnerPhoto;
   const refInstruction = singleReference
-    ? 'FACIAL CONSISTENCY: The characters must strictly match the ONE attached reference image (use it for both protagonists).'
-    : 'FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.';
+    ? 'CHARACTER CONSISTENCY: The two characters must look EXACTLY like the attached reference image in every detail (faces, features, hair). Use the same reference for both the man and the woman. Same couple, same faces, no variation between scenes.'
+    : 'CHARACTER CONSISTENCY: The two characters must look EXACTLY like the attached reference photos. Same faces, same features, same couple in every scene. Do not deviate from the reference.';
 
   const isStoryScene = scene.id >= 1 && scene.id <= 15;
   const safeZoneRules = isStoryScene
@@ -122,8 +122,10 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
     {
       text: `${finalPrompt}
 ${refInstruction}
-ORIENTATION RULE: Characters must be facing the FRONT/CAMERA. SIDE CHARACTER RULE: Others facing AWAY or obscured.
+ONLY TWO CHARACTERS: Show ONLY the couple (the man and the woman from the reference). No other people, no background characters, no extras, no strangers. The image must contain exactly these two characters and nothing else human.
+ORIENTATION RULE: Characters must be facing the FRONT/CAMERA.
 CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
+IMAGE QUALITY: The image MUST be sharp, in focus, and high detail. No blur, no motion blur, no soft focus, no out-of-focus areas. Crisp and clear throughout. High resolution, well-defined edges and features.
 ${isStoryScene ? 'SCENE RULE: This is a story scene illustration, NOT the book cover. Create a clearly different composition, setting, and moment from the cover.' : ''}
 ${safeZoneRules}
 TEXT RENDERING: Render any story text in the prompt clearly and legibly. SAFETY MARGINS: Full visibility, no cut-off. NO BORDERS.`,
