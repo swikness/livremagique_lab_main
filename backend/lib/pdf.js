@@ -5,10 +5,12 @@
 import sharp from 'sharp';
 import { jsPDF } from 'jspdf';
 
-const PAGE_W = 576;
-const PAGE_H = 1024;
-const COVER_SIZE = 576;
-const COVER_Y = (PAGE_H - COVER_SIZE) / 2;
+// Square page so images are never stretched (each page = square, image fills it)
+const PAGE_SIZE = 576;
+const PAGE_W = PAGE_SIZE;
+const PAGE_H = PAGE_SIZE;
+const COVER_SIZE = PAGE_SIZE;
+const COVER_Y = 0;
 
 /**
  * Crop 16:9 image to 2:1 (center crop) then split into [left, right] 1:1.
