@@ -16,7 +16,16 @@ Node.js API that creates a full book (plan + 17 images + PDF) from a sheet row a
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes* | Path to Google service account JSON (for Drive upload). |
 | `DRIVE_SERVICE_ACCOUNT_JSON` | Yes* | Alternative: path to service account JSON relative to cwd. |
 
-*One of the two is required for Drive upload. **Important:** Service accounts have no storage quota. The target folder must be in **your** Google Drive (or a Shared Drive), not the service account's. Share that folder with the service account email (Editor). If the folder is in a Shared Drive, add the service account as a member (Content manager).
+*One of the two is required for Drive upload.
+
+**Service account storage quota:** Service accounts cannot use their own storage. Uploads only work when the **output folder is inside a Shared Drive** (Google Workspace):
+
+1. Create a **Shared Drive** (or use an existing one): Google Drive → Shared drives → New.
+2. Add the **service account** as a member: open the Shared Drive → Manage members → Add the email from your JSON `client_email` (e.g. `xxx@project.iam.gserviceaccount.com`) with role **Content manager**.
+3. Create a folder inside that Shared Drive (or use the Shared Drive root). Copy the folder ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID`.
+4. In the GAS script, set `PDF_OUTPUT_FOLDER_ID` to that folder ID (the one inside the Shared Drive). The backend will create book subfolders and upload images there; they will use the Shared Drive’s quota.
+
+If you only have a personal Google account (no Workspace), you cannot create a Shared Drive. Use a Google Workspace trial, or host the output folder in a Workspace organization’s Shared Drive.
 
 ## Run locally
 
