@@ -62,6 +62,23 @@ function getImageFormat(dataUrl) {
 }
 
 /**
+ * Center-crop buffer to square (min(w,h) x min(w,h)). Returns JPEG buffer so PDF gets consistent format.
+ */
+async function ensureSquare(buffer) {
+  const meta = await sharp(buffer).metadata();
+  const w = meta.width || 1;
+  const h = meta.height || 1;
+  if (w === h) return await sharp(buffer).jpeg({ quality: 95 }).toBuffer();
+  const size = Math.min(w, h);
+  const left = Math.floor((w - size) / 2);
+  const top = Math.floor((h - size) / 2);
+  return sharp(buffer)
+    .extract({ left, top, width: size, height: size })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+}
+
+/**
  * @param {object} plan - { synopsis, scenes: [{ imageUrl, splitImages?, ... }] }
  * @param {string} buyerName - for filename
  * @param {boolean} isRTL - e.g. language === 'Arabic'
@@ -77,10 +94,12 @@ export async function buildPdf(plan, buyerName = 'Livre', isRTL = false) {
   const scenes = plan.scenes || [];
   if (scenes.length < 17) throw new Error('Plan must have 17 scenes');
 
-  // Page 1: Front cover (scene 0)
+  // Page 1: Front cover (scene 0) — center-crop to square so no stretch
   const frontCover = scenes[0].imageUrl;
   if (frontCover) {
-    doc.addImage(dataUrlToBase64(frontCover), getImageFormat(frontCover), 0, COVER_Y, COVER_SIZE, COVER_SIZE);
+    const coverBuf = Buffer.from(dataUrlToBase64(frontCover), 'base64');
+    const squareBuf = await ensureSquare(coverBuf);
+    doc.addImage(squareBuf.toString('base64'), 'JPEG', 0, COVER_Y, COVER_SIZE, COVER_SIZE);
   }
 
   // Pages 2-31: Scenes 1-15, each split into left + right
@@ -94,8 +113,12 @@ export async function buildPdf(plan, buyerName = 'Livre', isRTL = false) {
     } else if (scene.imageUrl) {
       const buf = Buffer.from(dataUrlToBase64(scene.imageUrl), 'base64');
       const [left, right] = await cropAndSplitToPages(buf);
-      leftImg = left;
-      rightImg = right;
+      const leftBuf = Buffer.from(dataUrlToBase64(left), 'base64');
+      const rightBuf = Buffer.from(dataUrlToBase64(right), 'base64');
+      const leftSquare = await ensureSquare(leftBuf);
+      const rightSquare = await ensureSquare(rightBuf);
+      leftImg = 'data:image/jpeg;base64,' + leftSquare.toString('base64');
+      rightImg = 'data:image/jpeg;base64,' + rightSquare.toString('base64');
     }
     if (leftImg && rightImg) {
       doc.addPage([PAGE_W, PAGE_H]);
@@ -111,11 +134,13 @@ export async function buildPdf(plan, buyerName = 'Livre', isRTL = false) {
     }
   }
 
-  // Page 32: Back cover (scene 16)
+  // Page 32: Back cover (scene 16) — center-crop to square so no stretch
   doc.addPage([PAGE_W, PAGE_H]);
   const backCover = scenes[16].imageUrl;
   if (backCover) {
-    doc.addImage(dataUrlToBase64(backCover), getImageFormat(backCover), 0, COVER_Y, COVER_SIZE, COVER_SIZE);
+    const backBuf = Buffer.from(dataUrlToBase64(backCover), 'base64');
+    const squareBuf = await ensureSquare(backBuf);
+    doc.addImage(squareBuf.toString('base64'), 'JPEG', 0, COVER_Y, COVER_SIZE, COVER_SIZE);
   }
 
   return Buffer.from(doc.output('arraybuffer'));
