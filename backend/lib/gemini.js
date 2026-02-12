@@ -72,7 +72,7 @@ NARRATIVE PERSONA: Use the Main Character's actual name (${input.name}) in story
 
 Return JSON: synopsis (string) and scenes (array of 17 items). Index 0 = Front Cover, 1-15 = Story scenes, 16 = Back Cover.
 For INDEX 0: title with names ${input.name} and ${input.partnerName}; prompt for cover with STYLE_INSTRUCTION placeholder.
-For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. LAYOUT: Put the narrative text on ONE side only (e.g. left half) and the two characters on the OPPOSITE side only (e.g. right half). Never put text and characters on the same side. Each scene must show a real, visible background (setting, place, environment) - not a solid color or fully blurred area. The scene must be continuous with no separator or panel. Describe so nothing important is in the center (image is split for book spine).
+For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. LAYOUT: Put the narrative text ONLY in the left 35-40% of the image so no word or line crosses the center (image is split for book spine). Put the two characters on the RIGHT half. Never put text and characters on the same side. Each scene must show a real, visible background. The scene must be continuous with no separator or panel. No text may extend into the center or right half.
 For INDEX 16: Back cover with TEXT AT THE TOP (synopsis or tagline), LOGO AT THE BOTTOM, and the two characters in the middle facing camera. Prompt must describe: text area at top, logo placement at bottom, characters in center.
 All text in ${input.language}. Return JSON only.`;
 
@@ -116,7 +116,7 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
   const isStoryScene = scene.id >= 1 && scene.id <= 15;
   const isBackCover = scene.id === 16 || scene.type === 'back-cover';
   const safeZoneRules = isStoryScene
-    ? `LAYOUT - TEXT AND CHARACTERS ON OPPOSITE SIDES: Put the narrative text on the LEFT half of the image only. Put the two characters on the RIGHT half of the image only. Do NOT put text and characters on the same side. The image is split down the center for the book spine - keep nothing important in the center strip. Fill the entire frame; no white space, no empty areas, no blank margins. TYPOGRAPHY: Use the same font style, size, and weight for the narrative text. No italics, no varying sizes. Consistent, readable text.`
+    ? `LAYOUT - TEXT AND CHARACTERS ON OPPOSITE SIDES: Put the narrative text ONLY in the LEFT 40% of the image (strictly left of center). Put the two characters on the RIGHT half. No word, line, or letter may cross the center line - the image is split down the center for the book spine, so any text that crosses will be cut in half. Keep all text in a narrow block on the left (e.g. left 35-40% of width); wrap long lines so they stay left of center. Do NOT put text and characters on the same side. Fill the entire frame; no white space. TYPOGRAPHY: Same font style, size, and weight. No italics, no varying sizes.`
     : '';
 
   const backCoverRules = isBackCover
@@ -185,4 +185,40 @@ TEXT RENDERING: Render any story text clearly and legibly. Same font style and s
     }
   }
   throw new Error('No image generated');
+}
+
+/**
+ * Verify a generated scene image: no white space, nothing important in center, no text crossing center, character consistency (if reference provided).
+ * @param {string} imageBase64 - data URL or raw base64 of the generated image
+ * @param {string|null} referenceBase64 - optional reference image (cover) for consistency check
+ * @returns {Promise<boolean>} true if image passes checks
+ */
+export async function verifySceneImage(imageBase64, referenceBase64 = null) {
+  const genAI = getAI();
+  const model = genAI.getGenerativeModel({ model: GEMINI_TEXT });
+  const b64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+  const parts = [
+    {
+      text: `You are checking an illustration for a book. The image will be split down the CENTER into two pages. Look at the attached image carefully.
+Answer with exactly YES or NO (one word only).
+(1) Is there NO large white or empty blank areas? The image should be filled with content.
+(2) Is there NO important content (text, faces, key elements) in the center vertical strip (middle third)? Text and faces must be entirely on the left or right side.
+(3) Does NO text (no word, line, or letter) cross or touch the center line? All text must be completely on one side (e.g. all on the left half).
+${referenceBase64 ? '(4) Do the two people in this image look like the same two people in the reference image (second attachment)? Same faces, consistent with reference.' : ''}
+If ALL of the above are true, respond YES. If any is false, respond NO.`,
+    },
+    { inlineData: { mimeType: 'image/png', data: b64 } },
+  ];
+  if (referenceBase64) {
+    const refB64 = referenceBase64.includes(',') ? referenceBase64.split(',')[1] : referenceBase64;
+    parts.push({ inlineData: { mimeType: 'image/png', data: refB64 } });
+  }
+  try {
+    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+    const text = (result.response.text() || '').trim().toUpperCase();
+    return text.startsWith('YES') || (text.includes('YES') && !text.startsWith('NO'));
+  } catch (e) {
+    console.warn('verifySceneImage error:', e.message);
+    return false;
+  }
 }
