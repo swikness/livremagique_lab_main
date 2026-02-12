@@ -71,7 +71,7 @@ Row 1 of the main sheet must contain the column headers. Data starts from row 2.
   - `WEBHOOK_URL`: **required for book creation.** The web app URL so the backend can update the sheet (Status Livre + Livre PDF). Must be the **exec** URL (see below).
   - `WEBHOOK_SECRET`: (optional) secret so only your backend can call the update-row webhook.
 - **Publish GAS as web app**: Deploy the script as a web app (Deploy → New deployment → Web app). Execute as: Me, Who has access: Anyone. Copy the **Web app URL** (it ends in `/exec`). Paste it in Script Properties as **WEBHOOK_URL**. Without this, the backend gets 404 when it tries to update the sheet.
-- **Output folder (Drive):** The script uses a fixed folder ID (`PDF_OUTPUT_FOLDER_ID` in the script) where book folders and images are uploaded. **This folder must be inside a Google Shared Drive** (Workspace), and the **service account** (from backend env `GOOGLE_SERVICE_ACCOUNT_JSON`) must be added as a **member of that Shared Drive** (Content manager). Otherwise you get “Service Accounts do not have storage quota”. See [backend/README.md](../backend/README.md) for step-by-step setup.
+- **Output folder (Drive):** The script uses a fixed folder ID (`PDF_OUTPUT_FOLDER_ID` in the script) where a subfolder is created per book and the 32-page PDF is uploaded. **This folder must be inside a Google Shared Drive** (Workspace), and the **service account** (from backend env `GOOGLE_SERVICE_ACCOUNT_JSON`) must be added as a **member of that Shared Drive** (Content manager). Otherwise you get “Service Accounts do not have storage quota”. See [backend/README.md](../backend/README.md) for step-by-step setup.
 
 ## 5. Workflow summary
 

@@ -56,6 +56,11 @@ function dataUrlToBase64(dataUrl) {
   return i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
 }
 
+function getImageFormat(dataUrl) {
+  if (!dataUrl) return 'JPEG';
+  return dataUrl.indexOf('image/png') >= 0 ? 'PNG' : 'JPEG';
+}
+
 /**
  * @param {object} plan - { synopsis, scenes: [{ imageUrl, splitImages?, ... }] }
  * @param {string} buyerName - for filename
@@ -75,7 +80,7 @@ export async function buildPdf(plan, buyerName = 'Livre', isRTL = false) {
   // Page 1: Front cover (scene 0)
   const frontCover = scenes[0].imageUrl;
   if (frontCover) {
-    doc.addImage(dataUrlToBase64(frontCover), 'JPEG', 0, COVER_Y, COVER_SIZE, COVER_SIZE);
+    doc.addImage(dataUrlToBase64(frontCover), getImageFormat(frontCover), 0, COVER_Y, COVER_SIZE, COVER_SIZE);
   }
 
   // Pages 2-31: Scenes 1-15, each split into left + right
@@ -110,7 +115,7 @@ export async function buildPdf(plan, buyerName = 'Livre', isRTL = false) {
   doc.addPage([PAGE_W, PAGE_H]);
   const backCover = scenes[16].imageUrl;
   if (backCover) {
-    doc.addImage(dataUrlToBase64(backCover), 'JPEG', 0, COVER_Y, COVER_SIZE, COVER_SIZE);
+    doc.addImage(dataUrlToBase64(backCover), getImageFormat(backCover), 0, COVER_Y, COVER_SIZE, COVER_SIZE);
   }
 
   return Buffer.from(doc.output('arraybuffer'));

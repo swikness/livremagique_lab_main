@@ -64,7 +64,7 @@ Story Concept: ${input.theme}
 Themes to include: ${themesStr}
 Visual Style: ${input.style}
 Target Language for ALL TEXT: ${input.language}
-STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
+STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}. Use SHORT LINES: avoid long single-line sentences. Break text into multiple short lines so no line is too long (the image is split down the center; long lines get cropped). Prefer 2-4 words per line where possible.
 
 STRICT CHARACTER RULE: The story MUST include ONLY the two main characters (the couple). Do NOT add any other people: no friends, no family, no strangers, no background characters, no extras. Every scene shows only the man and the woman.
 PROMPT GENERATION RULE: In the 'prompt' field for scenes, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple" - NOT the names. Describe ONLY these two characters; never mention or imply other people in the image.
@@ -72,7 +72,7 @@ NARRATIVE PERSONA: Use the Main Character's actual name (${input.name}) in story
 
 Return JSON: synopsis (string) and scenes (array of 17 items). Index 0 = Front Cover, 1-15 = Story scenes, 16 = Back Cover.
 For INDEX 0: title with names ${input.name} and ${input.partnerName}; prompt for cover with STYLE_INSTRUCTION placeholder.
-For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. LAYOUT: Put the narrative text ONLY in the left 35-40% of the image so no word or line crosses the center (image is split for book spine). Put the two characters on the RIGHT half. Never put text and characters on the same side. Each scene must show a real, visible background. The scene must be continuous with no separator or panel. No text may extend into the center or right half.
+For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. LAYOUT: Put the narrative text ONLY in the left 35-40% in SHORT LINES (2-4 words per line) so no line crosses the center. Put the two characters on the RIGHT half. Never put text and characters on the same side. Each scene must show a real, sharp, visible background - NO blurred panel, NO overlay color, NO solid background behind text, NO separator or divider. One continuous scene only.
 For INDEX 16: Back cover with TEXT AT THE TOP (synopsis or tagline), LOGO AT THE BOTTOM, and the two characters in the middle facing camera. Prompt must describe: text area at top, logo placement at bottom, characters in center.
 All text in ${input.language}. Return JSON only.`;
 
@@ -123,7 +123,7 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
     ? 'BACK COVER LAYOUT: Text (synopsis or tagline) at the TOP. Logo at the BOTTOM center. The two characters in the MIDDLE facing camera. Fill the frame; no white space.'
     : '';
 
-  const backgroundRules = `BACKGROUND - CONTINUOUS SCENE, NO FULL BLUR: The entire image must show a real, visible scene (setting, environment, details). Do NOT use a fully blurred background. Do NOT use a solid block of color behind the text. Do NOT add a separator, panel, or distinct area between the text and the scene. The scene must be ONE continuous image with no hard edges or dividers. To make the text readable, use ONLY a subtle soft shadow, gentle glow, or very slight blur immediately behind the text area - the rest of the scene must stay sharp and clearly visible. The background must be something you can see (place, objects, atmosphere), not a blank or totally blurred wash.`;
+  const backgroundRules = `BACKGROUND - NO BLUR, NO OVERLAY, NO SEPARATOR: The entire image must be ONE continuous, sharp, visible scene (setting, environment, details). Do NOT use a blurred panel, blurry area, or full blur behind the text. Do NOT use any overlay color, tint, or solid background color behind the text. Do NOT add a separator, divider, panel edge, or distinct block between text and scene. The scene must be one continuous image with no hard edges. For text readability use ONLY a very subtle shadow or soft glow on the letters themselves - nothing behind the text (no blur, no color block). The background must be fully visible and sharp everywhere.`;
 
   const parts = [
     {
@@ -137,7 +137,7 @@ ${backgroundRules}
 ${isStoryScene ? 'SCENE RULE: This is a story scene illustration, NOT the book cover. Create a clearly different composition, setting, and moment from the cover.' : ''}
 ${safeZoneRules}
 ${backCoverRules}
-TEXT RENDERING: Render any story text clearly and legibly. Same font style and size throughout. SAFETY MARGINS: Full visibility, no cut-off. NO BORDERS.`,
+TEXT RENDERING: Render story text in SHORT LINES (2-4 words per line) so no long line crosses the center. Same font style and size throughout. Full visibility, no cut-off. NO BORDERS.`,
     },
   ];
 
@@ -185,40 +185,4 @@ TEXT RENDERING: Render any story text clearly and legibly. Same font style and s
     }
   }
   throw new Error('No image generated');
-}
-
-/**
- * Verify a generated scene image: no white space, nothing important in center, no text crossing center, character consistency (if reference provided).
- * @param {string} imageBase64 - data URL or raw base64 of the generated image
- * @param {string|null} referenceBase64 - optional reference image (cover) for consistency check
- * @returns {Promise<boolean>} true if image passes checks
- */
-export async function verifySceneImage(imageBase64, referenceBase64 = null) {
-  const genAI = getAI();
-  const model = genAI.getGenerativeModel({ model: GEMINI_TEXT });
-  const b64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
-  const parts = [
-    {
-      text: `You are checking an illustration for a book. The image will be split down the CENTER into two pages. Look at the attached image carefully.
-Answer with exactly YES or NO (one word only).
-(1) Is there NO large white or empty blank areas? The image should be filled with content.
-(2) Is there NO important content (text, faces, key elements) in the center vertical strip (middle third)? Text and faces must be entirely on the left or right side.
-(3) Does NO text (no word, line, or letter) cross or touch the center line? All text must be completely on one side (e.g. all on the left half).
-${referenceBase64 ? '(4) Do the two people in this image look like the same two people in the reference image (second attachment)? Same faces, consistent with reference.' : ''}
-If ALL of the above are true, respond YES. If any is false, respond NO.`,
-    },
-    { inlineData: { mimeType: 'image/png', data: b64 } },
-  ];
-  if (referenceBase64) {
-    const refB64 = referenceBase64.includes(',') ? referenceBase64.split(',')[1] : referenceBase64;
-    parts.push({ inlineData: { mimeType: 'image/png', data: refB64 } });
-  }
-  try {
-    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
-    const text = (result.response.text() || '').trim().toUpperCase();
-    return text.startsWith('YES') || (text.includes('YES') && !text.startsWith('NO'));
-  } catch (e) {
-    console.warn('verifySceneImage error:', e.message);
-    return false;
-  }
 }
