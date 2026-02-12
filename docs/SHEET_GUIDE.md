@@ -33,6 +33,24 @@ The **first sheet** (used by the script) should have these columns (A–X). Colu
 
 **Output folder:** The generated PDF is always saved to the same Drive folder (fixed ID in the script). No column is used for the folder.
 
+### Fields used for story creation only
+
+These columns are the **only** ones used to build the story (theme, characters, language, style, and the 17-part plan and scene text):
+
+| Column | Header | Use in story |
+|--------|--------|---------------|
+| D | Livre Choisi | Theme type (Raisons / Années / Liste / 100% Sur Mesure). |
+| E | Pour Qui | HER vs HIM in theme. |
+| F–I | Prénom/Âge (Lui/Elle) | Character names and ages. |
+| J | Langue | Language for all story and scene text. |
+| K | Style | Visual style for image prompts. |
+| L | Années | For “Années d’Amour” theme. |
+| N | Description | Extra context for “100% Sur Mesure”. |
+| O | Les 10 Moments | **Scenes description / what the book is about** — used for all book types (including personalized Sur Mesure) to drive scene content. |
+
+- **M (Titre Perso)** is for the **cover title only**; it is not used when generating the story or theme.
+- **V (Couverture)** is used only as the front-cover image (page 1) and as the visual reference for scene/back-cover images; it is not an input to the story text.
+
 ---
 
 ## 2. Guide sheet (second tab)

@@ -40,18 +40,22 @@ export function mapRowToUserInput(row) {
   const options = optionsList ? optionsList.split(',').map((s) => s.trim()).filter(Boolean) : [];
   const bookName = String(row.bookName || '').trim();
   const years = String(row.years || '2').trim();
-  const customTitle = String(row.customTitle || '').trim();
   const customNote = String(row.customNote || '').trim();
+  // Column O (optionsList) = scenes description / what the book is about, for ALL book types including Sur Mesure.
+  // Column M (customTitle) is for the cover title only — not used in story theme.
+
+  const scenesDescription = optionsList || (options.length ? options.join(', ') : '');
+  const scenesDescForTheme = scenesDescription || 'Our love story';
 
   let theme;
   if (bookName.includes("Sur Mesure") || bookName.includes("100%")) {
-    theme = `Story Type: CUSTOM_STORY. Book Title: "${customTitle || 'Livre personnalisé'}". Story Synopsis: "${customNote || 'Une histoire d\'amour.'}". This is a personalized love story book where the cover and all illustrations must visually represent the title and synopsis provided.`;
+    theme = `Story Type: CUSTOM_STORY. What the book is about (scenes description): "${scenesDescForTheme}". ${customNote ? `Additional context: "${customNote}".` : ''} This is a personalized love story; generate 15 distinct story scenes based on this description.`;
   } else if (bookName.includes("Années") || bookName.includes("Amour")) {
-    theme = `Story Type: LOVE_STORY. Specifically covering ${years} years of love. Recipient: ${recipient}. Key milestones chosen by user: ${options.join(' | ') || 'Our love story'}`;
+    theme = `Story Type: LOVE_STORY. Specifically covering ${years} years of love. Recipient: ${recipient}. What the book is about / scenes description: ${scenesDescForTheme}`;
   } else if (bookName.includes("Liste") || bookName.includes("Rêves")) {
-    theme = `Story Type: BUCKET_LIST. Recipient: ${recipient}. Key milestones chosen by user: ${options.join(' | ') || 'Our bucket list'}`;
+    theme = `Story Type: BUCKET_LIST. Recipient: ${recipient}. What the book is about / scenes description: ${scenesDescForTheme}`;
   } else {
-    theme = `Story Type: 10_REASONS. Recipient: ${recipient}. Key milestones chosen by user: ${options.join(' | ') || 'Reasons I love you'}`;
+    theme = `Story Type: 10_REASONS. Recipient: ${recipient}. What the book is about / scenes description: ${scenesDescForTheme}`;
   }
 
   const userInput = {

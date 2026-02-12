@@ -72,7 +72,7 @@ NARRATIVE PERSONA: Use the Main Character's actual name (${input.name}) in story
 
 Return JSON: synopsis (string) and scenes (array of 17 items). Index 0 = Front Cover, 1-15 = Story scenes, 16 = Back Cover.
 For INDEX 0: title with names ${input.name} and ${input.partnerName}; prompt for cover with STYLE_INSTRUCTION placeholder.
-For INDEX 1-15: storyText (~${input.wordsPerScene} words), prompt with {STYLE_INSTRUCTION} and [STORY_TEXT] placeholders, side-by-side layout for text.
+For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe the scene so that characters and any text are on the LEFT or RIGHT side of the image, never in the center (the image is split down the center for the book spine).
 For INDEX 16: Back cover prompt, synopsis area, characters facing camera.
 All text in ${input.language}. Return JSON only.`;
 
@@ -102,11 +102,21 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
   } else {
     finalPrompt = `STYLE: ${styleKeywords}. ${finalPrompt}`;
   }
+  // Inject actual story text so it appears on the image (replaces [STORY_TEXT] placeholder)
+  const storyText = (scene.storyText || '').trim().slice(0, 400);
+  if (finalPrompt.includes('[STORY_TEXT]')) {
+    finalPrompt = finalPrompt.replace('[STORY_TEXT]', storyText || '(scene text)');
+  }
 
   const singleReference = mainCharacterPhoto && !partnerPhoto;
   const refInstruction = singleReference
     ? 'FACIAL CONSISTENCY: The characters must strictly match the ONE attached reference image (use it for both protagonists).'
     : 'FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.';
+
+  const isStoryScene = scene.id >= 1 && scene.id <= 15;
+  const safeZoneRules = isStoryScene
+    ? `COMPOSITION FOR BOOK SPINE: This image will be split down the CENTER into two pages. Keep ALL important content OFF the center: no text, no faces, no key elements in the middle vertical strip. Place the narrative text and characters entirely in the LEFT half of the image so the spine does not crop them. Render the story text clearly and legibly on the left side only. NO text or characters in the center.`
+    : '';
 
   const parts = [
     {
@@ -114,7 +124,9 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
 ${refInstruction}
 ORIENTATION RULE: Characters must be facing the FRONT/CAMERA. SIDE CHARACTER RULE: Others facing AWAY or obscured.
 CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
-TEXT RENDERING: If the prompt contains a TEXT: instruction, render that text exactly. SAFETY MARGINS: Full visibility, no cut-off. NO BORDERS.`,
+${isStoryScene ? 'SCENE RULE: This is a story scene illustration, NOT the book cover. Create a clearly different composition, setting, and moment from the cover.' : ''}
+${safeZoneRules}
+TEXT RENDERING: Render any story text in the prompt clearly and legibly. SAFETY MARGINS: Full visibility, no cut-off. NO BORDERS.`,
     },
   ];
 
@@ -135,13 +147,13 @@ TEXT RENDERING: If the prompt contains a TEXT: instruction, render that text exa
 
   const model = genAI.getGenerativeModel({ model: GEMINI_IMAGE });
   const aspectRatioInstruction = scene.aspectRatio === '1:1' ? 'Aspect Ratio: 1:1 Square' : 'Aspect Ratio: 16:9 Wide';
-  const finalPromptWithRatio = `${activeStyle}. ${aspectRatioInstruction}. ${finalPrompt}`;
+  const fullText = `${activeStyle}. ${aspectRatioInstruction}.\n\n${parts[0].text}`;
 
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: finalPromptWithRatio }, ...parts.slice(1)] }],
+        contents: [{ role: 'user', parts: [{ text: fullText }, ...parts.slice(1)] }],
       });
       const candidates = result.response.candidates;
       if (!candidates?.length) throw new Error('No image data returned');
