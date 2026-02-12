@@ -1,12 +1,16 @@
 /**
  * Backend API: POST /createBook — receive row from GAS, run Gemini pipeline, create Drive folder, upload cover then scene images (cropped left/right) one by one, update sheet via webhook.
+ * OAuth: GET /auth/drive and /auth/drive/callback to get a refresh token for Drive uploads (personal account).
  */
 import express from 'express';
 import sharp from 'sharp';
+import { google } from 'googleapis';
 import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
 import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
 import { createFolder, uploadImage } from './lib/drive.js';
 import { callWebhook } from './lib/webhook.js';
+
+const DRIVE_SCOPE = ['https://www.googleapis.com/auth/drive.file'];
 
 function base64ToBuffer(dataUrl) {
   const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -21,6 +25,53 @@ function getMimeFromDataUrl(dataUrl) {
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
+
+// --- OAuth: one-time flow to get refresh token for Drive (personal account) ---
+app.get('/auth/drive', (req, res) => {
+  const baseUrl = process.env.BACKEND_PUBLIC_URL || (req.protocol + '://' + req.get('host'));
+  const redirectUri = baseUrl.replace(/\/$/, '') + '/auth/drive/callback';
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return res.status(500).send('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in env. Add redirect URI in Google Console: ' + redirectUri);
+  }
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const url = oauth2.generateAuthUrl({
+    scope: DRIVE_SCOPE,
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+  res.redirect(url);
+});
+
+app.get('/auth/drive/callback', async (req, res) => {
+  const baseUrl = process.env.BACKEND_PUBLIC_URL || (req.protocol + '://' + req.get('host'));
+  const redirectUri = baseUrl.replace(/\/$/, '') + '/auth/drive/callback';
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { code } = req.query;
+  if (!code) {
+    return res.status(400).send('Missing code');
+  }
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  try {
+    const { tokens } = await oauth2.getToken(code);
+    const refreshToken = tokens.refresh_token;
+    if (!refreshToken) {
+      return res.status(400).send('No refresh_token. Revoke app access at myaccount.google.com/permissions and try again with prompt=consent.');
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`
+      <h1>Drive OAuth done</h1>
+      <p>Add this to Railway (or your env) as <strong>DRIVE_REFRESH_TOKEN</strong>:</p>
+      <textarea readonly style="width:100%;height:120px;font-family:monospace">${refreshToken}</textarea>
+      <p>Then remove GOOGLE_SERVICE_ACCOUNT_JSON if you had it. Redeploy and run "Créer le livre" again.</p>
+    `);
+  } catch (e) {
+    console.error('OAuth callback error:', e);
+    res.status(500).send('Error: ' + e.message);
+  }
+});
 
 app.post('/createBook', async (req, res) => {
   const {

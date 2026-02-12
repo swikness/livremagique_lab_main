@@ -4,8 +4,10 @@ Node.js API that creates a full book (plan + 17 images + PDF) from a sheet row a
 
 ## Endpoints
 
-- `POST /createBook` — Body: `{ spreadsheetId, rowIndex, outputFolderId, webhookUrl, webhookSecret, row }`. Runs the pipeline and calls the webhook with status + PDF link.
+- `POST /createBook` — Body: `{ spreadsheetId, rowIndex, outputFolderId, webhookUrl, webhookSecret, row }`. Runs the pipeline and calls the webhook with status + folder link.
 - `GET /health` — Returns `{ ok: true }`.
+- `GET /auth/drive` — Start OAuth flow to get a refresh token for Drive (personal account).
+- `GET /auth/drive/callback` — OAuth callback; shows the refresh token to copy into `DRIVE_REFRESH_TOKEN`.
 
 ## Environment variables
 
@@ -14,11 +16,15 @@ Node.js API that creates a full book (plan + 17 images + PDF) from a sheet row a
 | `GEMINI_API_KEY` | Yes | Google Gemini API key. |
 | `PORT` | No | Server port (default 8080). |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes* | Path to Google service account JSON (for Drive upload). |
-| `DRIVE_SERVICE_ACCOUNT_JSON` | Yes* | Alternative: path to service account JSON relative to cwd. |
+| `GOOGLE_CLIENT_ID` | For OAuth | OAuth 2.0 Client ID (Google Console). |
+| `GOOGLE_CLIENT_SECRET` | For OAuth | OAuth 2.0 Client secret. |
+| `DRIVE_REFRESH_TOKEN` | For OAuth | Refresh token from one-time `/auth/drive` flow. |
+| `BACKEND_PUBLIC_URL` | For OAuth | Base URL of backend, e.g. `https://your-app.up.railway.app`. |
+| `DRIVE_SERVICE_ACCOUNT_JSON` | For SA | JSON string or path for service account. |
 
-*One of the two is required for Drive upload.
+**Drive:** use **either** OAuth (personal account) **or** service account. **Option A — OAuth (personal):** 1) Google Console → Credentials → OAuth client ID (Web app), add redirect URI `https://YOUR-BACKEND/auth/drive/callback`. 2) Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BACKEND_PUBLIC_URL in Railway. 3) Open `/auth/drive` in browser, sign in, copy the refresh token. 4) Set DRIVE_REFRESH_TOKEN in Railway; remove GOOGLE_SERVICE_ACCOUNT_JSON. 5) PDF_OUTPUT_FOLDER_ID = your My Drive folder. **Option B — Service account:** output folder must be in a Shared Drive (Workspace); add service account as member.
 
-**Service account storage quota:** Service accounts cannot use their own storage. Uploads only work when the **output folder is inside a Shared Drive** (Google Workspace):
+**Service account storage quota (Option B only):** Service accounts cannot use their own storage. Uploads only work when the **output folder is inside a Shared Drive** (Google Workspace):
 
 1. Create a **Shared Drive** (or use an existing one): Google Drive → Shared drives → New.
 2. Add the **service account** as a member: open the Shared Drive → Manage members → Add the email from your JSON `client_email` (e.g. `xxx@project.iam.gserviceaccount.com`) with role **Content manager**.

@@ -1,12 +1,29 @@
 /**
- * Upload PDF buffer to Google Drive folder. Uses service account (GOOGLE_APPLICATION_CREDENTIALS or DRIVE_SERVICE_ACCOUNT_JSON).
+ * Drive: OAuth2 (user's Drive, uses their quota) or service account.
+ * Prefer OAuth when GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, DRIVE_REFRESH_TOKEN are set.
  */
 import { google } from 'googleapis';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
 
+const DRIVE_SCOPE = ['https://www.googleapis.com/auth/drive.file'];
+
 function getAuth() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.DRIVE_REFRESH_TOKEN;
+
+  if (clientId && clientSecret && refreshToken) {
+    const oauth2Client = new google.auth.OAuth2(
+      clientId,
+      clientSecret,
+      process.env.DRIVE_REDIRECT_URI || ''
+    );
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    return oauth2Client;
+  }
+
   const credsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   const jsonPath = process.env.DRIVE_SERVICE_ACCOUNT_JSON;
   const jsonString = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -18,13 +35,14 @@ function getAuth() {
   } else if (credsPath) {
     key = JSON.parse(readFileSync(path.resolve(credsPath), 'utf8'));
   } else {
-    throw new Error('Set GOOGLE_SERVICE_ACCOUNT_JSON (JSON string), GOOGLE_APPLICATION_CREDENTIALS, or DRIVE_SERVICE_ACCOUNT_JSON for Drive upload');
+    throw new Error(
+      'Set DRIVE_REFRESH_TOKEN + GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET (OAuth), or GOOGLE_SERVICE_ACCOUNT_JSON (service account) for Drive'
+    );
   }
-  const auth = new google.auth.GoogleAuth({
+  return new google.auth.GoogleAuth({
     credentials: key,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes: DRIVE_SCOPE,
   });
-  return auth;
 }
 
 /**
