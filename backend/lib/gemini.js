@@ -145,9 +145,13 @@ TEXT RENDERING: If the prompt contains a TEXT: instruction, render that text exa
       });
       const candidates = result.response.candidates;
       if (!candidates?.length) throw new Error('No image data returned');
-      for (const part of candidates[0].content.parts) {
-        if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+      const content = candidates[0].content;
+      const parts = content?.parts;
+      const partsList = Array.isArray(parts) ? parts : (parts ? [parts] : []);
+      for (const part of partsList) {
+        if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
       }
+      if (partsList.length === 0) throw new Error('Response has no parts');
     } catch (err) {
       if (attempt > maxRetries) throw err;
       const wait = 2000 * Math.pow(2, attempt - 1);
