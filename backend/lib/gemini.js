@@ -146,8 +146,8 @@ TEXT RENDERING: If the prompt contains a TEXT: instruction, render that text exa
       const candidates = result.response.candidates;
       if (!candidates?.length) throw new Error('No image data returned');
       const content = candidates[0].content;
-      const parts = content?.parts;
-      const partsList = Array.isArray(parts) ? parts : (parts ? [parts] : []);
+      const responseParts = content?.parts;
+      const partsList = Array.isArray(responseParts) ? responseParts : (responseParts ? [responseParts] : []);
       for (const part of partsList) {
         if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
       }
