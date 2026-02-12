@@ -37,6 +37,7 @@ export async function uploadPdf(pdfBuffer, folderId, fileName) {
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
 
+  // supportsAllDrives: true so uploads work when folder is in a Shared Drive (service accounts have no personal quota)
   const res = await drive.files.create({
     requestBody: {
       name: fileName || 'Livre-Magique.pdf',
@@ -46,6 +47,7 @@ export async function uploadPdf(pdfBuffer, folderId, fileName) {
       mimeType: 'application/pdf',
       body: Readable.from(pdfBuffer),
     },
+    supportsAllDrives: true,
   });
 
   const fileId = res.data.id;
@@ -57,6 +59,7 @@ export async function uploadPdf(pdfBuffer, folderId, fileName) {
       role: 'reader',
       type: 'anyone',
     },
+    supportsAllDrives: true,
   });
 
   return `https://drive.google.com/file/d/${fileId}/view`;

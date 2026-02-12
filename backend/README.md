@@ -16,7 +16,7 @@ Node.js API that creates a full book (plan + 17 images + PDF) from a sheet row a
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes* | Path to Google service account JSON (for Drive upload). |
 | `DRIVE_SERVICE_ACCOUNT_JSON` | Yes* | Alternative: path to service account JSON relative to cwd. |
 
-*One of the two is required for Drive upload. Share the target Drive folder with the service account email (editor or writer).
+*One of the two is required for Drive upload. **Important:** Service accounts have no storage quota. The target folder must be in **your** Google Drive (or a Shared Drive), not the service account's. Share that folder with the service account email (Editor). If the folder is in a Shared Drive, add the service account as a member (Content manager).
 
 ## Run locally
 
