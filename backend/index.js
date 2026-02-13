@@ -1,8 +1,11 @@
 /**
  * Backend API: POST /createBook — receive row from GAS, run Gemini pipeline, build 32-page PDF, upload PDF to Drive folder, update sheet via webhook with PDF link.
+ * Sheet-to-app: POST /sheet/prepare, GET /sheet/session/:id, POST /uploadPdf for app review flow.
  * OAuth: GET /auth/drive and /auth/drive/callback to get a refresh token for Drive uploads (personal account).
  */
+import crypto from 'crypto';
 import express from 'express';
+import multer from 'multer';
 import { google } from 'googleapis';
 import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
 import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
@@ -12,8 +15,28 @@ import { callWebhook } from './lib/webhook.js';
 
 const DRIVE_SCOPE = ['https://www.googleapis.com/auth/drive.file'];
 
+// In-memory session store for sheet-to-app flow (sessionId -> { row, ..., createdAt })
+const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
+const sheetSessions = new Map();
+
+function purgeExpiredSessions() {
+  const now = Date.now();
+  for (const [id, data] of sheetSessions.entries()) {
+    if (now - data.createdAt > SESSION_TTL_MS) sheetSessions.delete(id);
+  }
+}
+
 const app = express();
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 // --- OAuth: one-time flow to get refresh token for Drive (personal account) ---
 app.get('/auth/drive', (req, res) => {
@@ -60,6 +83,73 @@ app.get('/auth/drive/callback', async (req, res) => {
     console.error('OAuth callback error:', e);
     res.status(500).send('Error: ' + e.message);
   }
+});
+
+// --- Sheet-to-app: prepare session (GAS opens app with sessionId) ---
+app.post('/sheet/prepare', (req, res) => {
+  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret } = req.body || {};
+  if (!row || !outputFolderId || !spreadsheetId || rowIndex == null) {
+    return res.status(400).json({
+      error: 'Missing required fields: row, outputFolderId, spreadsheetId, rowIndex',
+    });
+  }
+  if (!row.coverImageBase64) {
+    return res.status(400).json({
+      error: 'Missing coverImageBase64 (front cover from sheet column V).',
+    });
+  }
+  const safeRowIndex = parseInt(rowIndex, 10);
+  if (safeRowIndex < 2) {
+    return res.status(400).json({ error: 'rowIndex must be >= 2' });
+  }
+  let userInput;
+  let theme;
+  try {
+    const mapped = mapRowToUserInput(row);
+    userInput = mapped.userInput;
+    theme = mapped.theme;
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid row data: ' + e.message });
+  }
+  purgeExpiredSessions();
+  const sessionId = crypto.randomUUID();
+  const name1 = (row.partner1Name || 'Lui').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
+  const name2 = (row.partner2Name || 'Elle').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
+  const buyerName = (row.buyerName || `${name1}-${name2}`).replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Livre';
+  sheetSessions.set(sessionId, {
+    row,
+    outputFolderId,
+    spreadsheetId,
+    rowIndex: safeRowIndex,
+    webhookUrl: webhookUrl || '',
+    webhookSecret: webhookSecret || '',
+    userInput,
+    theme,
+    coverBase64: row.coverImageBase64,
+    buyerName,
+    createdAt: Date.now(),
+  });
+  res.status(200).json({ sessionId });
+});
+
+// --- Sheet-to-app: fetch session (app loads with ?fromSheet=sessionId) ---
+app.get('/sheet/session/:id', (req, res) => {
+  purgeExpiredSessions();
+  const data = sheetSessions.get(req.params.id);
+  if (!data) {
+    return res.status(404).json({ error: 'Session not found or expired' });
+  }
+  res.status(200).json({
+    userInput: data.userInput,
+    theme: data.theme,
+    coverBase64: data.coverBase64,
+    outputFolderId: data.outputFolderId,
+    spreadsheetId: data.spreadsheetId,
+    rowIndex: data.rowIndex,
+    webhookUrl: data.webhookUrl,
+    webhookSecret: data.webhookSecret,
+    buyerName: data.buyerName,
+  });
 });
 
 app.post('/createBook', async (req, res) => {
@@ -172,6 +262,39 @@ app.post('/createBook', async (req, res) => {
     console.warn('Webhook "Généré" failed:', e.message);
   }
 
+  res.status(200).json({ success: true, pdfUrl });
+});
+
+// --- Sheet-to-app: app uploads built PDF, backend uploads to Drive and updates sheet ---
+app.post('/uploadPdf', upload.single('file'), async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: 'Missing PDF file' });
+  }
+  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName } = req.body || {};
+  if (!folderId || !spreadsheetId || rowIndex == null) {
+    return res.status(400).json({
+      error: 'Missing required fields: folderId, spreadsheetId, rowIndex',
+    });
+  }
+  const safeRowIndex = parseInt(rowIndex, 10);
+  if (safeRowIndex < 2) {
+    return res.status(400).json({ error: 'rowIndex must be >= 2' });
+  }
+  const fileName = (buyerName && typeof buyerName === 'string')
+    ? `${String(buyerName).replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Livre'}.pdf`
+    : 'Livre-Magique.pdf';
+  let pdfUrl;
+  try {
+    pdfUrl = await uploadPdf(req.file.buffer, folderId, fileName);
+  } catch (e) {
+    console.error('uploadPdf error:', e);
+    return res.status(500).json({ error: 'Drive upload failed: ' + e.message });
+  }
+  try {
+    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, 'Généré', pdfUrl);
+  } catch (e) {
+    console.warn('Webhook failed:', e.message);
+  }
   res.status(200).json({ success: true, pdfUrl });
 });
 

@@ -22,6 +22,17 @@ const LANGUAGES = ["French", "Arabic", "English", "Spanish"];
 type LoversStoryType = '10_REASONS' | 'LOVE_STORY' | 'BUCKET_LIST' | 'CUSTOM_STORY' | null;
 type RecipientType = 'HIM' | 'HER';
 
+const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) || '';
+
+export interface SheetContext {
+  outputFolderId: string;
+  spreadsheetId: string;
+  rowIndex: number;
+  webhookUrl: string;
+  webhookSecret: string;
+  buyerName: string;
+}
+
 const TRANSLATIONS = {
   French: {
     appTitle: "Livre Magique Lab",
@@ -83,6 +94,10 @@ const TRANSLATIONS = {
     customSynopsisPlaceholder: "Décrivez votre histoire en quelques phrases...",
     storyTypeOptions: "Options Type d'Histoire",
     customInstructions: "Instructions Personnalisées (Optionnel)",
+    dataLoadedFromSheet: "Données chargées depuis la sheet. Vérifiez puis cliquez sur Confirmer et générer.",
+    confirmAndGenerate: "Confirmer et générer",
+    sendToDrive: "Envoyer vers Drive",
+    pdfSentToDrive: "PDF envoyé vers Drive. La sheet a été mise à jour.",
   },
   English: {
     appTitle: "Magical Book Lab",
@@ -144,6 +159,10 @@ const TRANSLATIONS = {
     customSynopsisPlaceholder: "Describe your story in a few sentences...",
     storyTypeOptions: "Story Type Options",
     customInstructions: "Custom Instructions (Optional)",
+    dataLoadedFromSheet: "Data loaded from sheet. Review and click Confirm & Generate.",
+    confirmAndGenerate: "Confirm & Generate",
+    sendToDrive: "Send to Drive",
+    pdfSentToDrive: "PDF sent to Drive. Sheet has been updated.",
   }
 };
 
@@ -345,6 +364,35 @@ const App: React.FC = () => {
     loadLogo();
   }, []);
 
+  // Load from-sheet session when URL has ?fromSheet=sessionId
+  useEffect(() => {
+    if (!BACKEND_URL) return;
+    const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const sessionId = params.get('fromSheet');
+    if (!sessionId) return;
+    setFromSheetLoading(true);
+    setFromSheetError(null);
+    fetch(`${BACKEND_URL.replace(/\/$/, '')}/sheet/session/${sessionId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(res.status === 404 ? 'Session expired or not found' : `Error ${res.status}`);
+        return res.json();
+      })
+      .then((data: { userInput: UserInput; theme: string; coverBase64: string; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
+        setUserInput({ ...data.userInput, theme: data.theme });
+        setSheetCoverBase64(data.coverBase64);
+        setSheetContext({
+          outputFolderId: data.outputFolderId,
+          spreadsheetId: data.spreadsheetId,
+          rowIndex: data.rowIndex,
+          webhookUrl: data.webhookUrl || '',
+          webhookSecret: data.webhookSecret || '',
+          buyerName: data.buyerName || 'Livre',
+        });
+      })
+      .catch((e: Error) => setFromSheetError(e.message || 'Failed to load session'))
+      .finally(() => setFromSheetLoading(false));
+  }, []);
+
   // New state for Photo Quality and Control
   const [photoQuality, setPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
   const [partnerPhotoQuality, setPartnerPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
@@ -359,6 +407,12 @@ const App: React.FC = () => {
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
   const [quickCoverCustomInstructions, setQuickCoverCustomInstructions] = useState<string>('');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
+
+  // Sheet-to-app (from-sheet) state
+  const [sheetContext, setSheetContext] = useState<SheetContext | null>(null);
+  const [sheetCoverBase64, setSheetCoverBase64] = useState<string | null>(null);
+  const [fromSheetLoading, setFromSheetLoading] = useState(false);
+  const [fromSheetError, setFromSheetError] = useState<string | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -527,6 +581,20 @@ const App: React.FC = () => {
     const right = canvas.toDataURL('image/jpeg');
 
     return [left, right];
+  };
+
+  const ensureSquareDataUrl = async (dataUrl: string): Promise<string> => {
+    const image = await createImage(dataUrl);
+    const size = Math.min(image.width, image.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    const sx = (image.width - size) / 2;
+    const sy = (image.height - size) / 2;
+    ctx.drawImage(image, sx, sy, size, size, 0, 0, size, size);
+    return canvas.toDataURL('image/jpeg', 0.95);
   };
 
   const downloadImage = (url: string, filename: string) => {
@@ -781,6 +849,48 @@ const App: React.FC = () => {
       setLoading(false);
     }
 
+  };
+
+  const handleSheetConfirmAndGenerate = async () => {
+    if (!sheetContext || !sheetCoverBase64) return;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const plan = await generateStoryPlan(userInput);
+      plan.scenes[0].imageUrl = sheetCoverBase64;
+      plan.scenes[0].status = 'done';
+      setStoryPlan(plan);
+      setStep(AppStep.CREATION);
+      setLoading(false);
+
+      // Generate scenes 1-16 (skip 0, cover from sheet)
+      setIsGeneratingScenes(true);
+      const newScenes = [...plan.scenes];
+      for (let i = 1; i <= 16; i++) {
+        const scene = newScenes[i];
+        const isCover = i === 16;
+        try {
+          scene.status = 'loading';
+          setStoryPlan({ ...plan, scenes: [...newScenes] });
+          const rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+          scene.imageUrl = rawImage;
+          addToHistory(scene, rawImage);
+          scene.status = 'done';
+          scene.aspectRatio = isCover ? '1:1' : '16:9';
+          scene.splitImages = undefined;
+        } catch (e) {
+          console.error(`Sheet gen scene ${i} error:`, e);
+          scene.status = 'error';
+        }
+        setStoryPlan({ ...plan, scenes: [...newScenes] });
+      }
+    } catch (error: any) {
+      console.error(error);
+      setErrorMessage(error.message || 'Failed to generate story plan.');
+    } finally {
+      setLoading(false);
+      setIsGeneratingScenes(false);
+    }
   };
 
   const handleQuickCoverGen = async () => {
@@ -1148,6 +1258,99 @@ const App: React.FC = () => {
   const handleExportToDrive = () => {
     // Client-side export shortcut
     handleDownloadPDF('PAGES');
+  };
+
+  const buildSquarePdfForDrive = async (): Promise<Blob> => {
+    if (!storyPlan || storyPlan.scenes.length < 17) throw new Error('Plan must have 17 scenes');
+    const PAGE = 576;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE, PAGE] });
+    const isRTL = userInput.language === 'Arabic';
+
+    const dataUrlToBase64 = (dataUrl: string) => {
+      const i = dataUrl.indexOf(',');
+      return i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+    };
+
+    const frontCover = storyPlan.scenes[0].imageUrl;
+    if (frontCover) {
+      const square = await ensureSquareDataUrl(frontCover);
+      doc.addImage(dataUrlToBase64(square), 'JPEG', 0, 0, PAGE, PAGE);
+    }
+
+    for (let i = 1; i <= 15; i++) {
+      const scene = storyPlan.scenes[i];
+      let leftImg: string | null = null;
+      let rightImg: string | null = null;
+      if (scene.splitImages && scene.splitImages.length === 2) {
+        leftImg = await ensureSquareDataUrl(scene.splitImages[0]);
+        rightImg = await ensureSquareDataUrl(scene.splitImages[1]);
+      } else if (scene.imageUrl) {
+        const cropped = await autoCropToRatio(scene.imageUrl, 2);
+        const [left, right] = await splitImage(cropped);
+        leftImg = await ensureSquareDataUrl(left);
+        rightImg = await ensureSquareDataUrl(right);
+      }
+      if (leftImg && rightImg) {
+        doc.addPage([PAGE, PAGE]);
+        if (isRTL) {
+          doc.addImage(dataUrlToBase64(rightImg), 'JPEG', 0, 0, PAGE, PAGE);
+          doc.addPage([PAGE, PAGE]);
+          doc.addImage(dataUrlToBase64(leftImg), 'JPEG', 0, 0, PAGE, PAGE);
+        } else {
+          doc.addImage(dataUrlToBase64(leftImg), 'JPEG', 0, 0, PAGE, PAGE);
+          doc.addPage([PAGE, PAGE]);
+          doc.addImage(dataUrlToBase64(rightImg), 'JPEG', 0, 0, PAGE, PAGE);
+        }
+      }
+    }
+
+    doc.addPage([PAGE, PAGE]);
+    const backCover = storyPlan.scenes[16].imageUrl;
+    if (backCover) {
+      const square = await ensureSquareDataUrl(backCover);
+      doc.addImage(dataUrlToBase64(square), 'JPEG', 0, 0, PAGE, PAGE);
+    }
+
+    return doc.output('blob');
+  };
+
+  const handleSendToDrive = async () => {
+    if (!sheetContext || !storyPlan) return;
+    const unsplit = [];
+    for (let i = 1; i <= 15; i++) {
+      if (!storyPlan.scenes[i].splitImages) unsplit.push(i);
+    }
+    if (unsplit.length > 0) {
+      setErrorMessage(uiLanguage === 'French'
+        ? "Divisez toutes les scènes (1-15) avant d'envoyer vers Drive."
+        : "Split all scenes (1-15) before sending to Drive.");
+      return;
+    }
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const blob = await buildSquarePdfForDrive();
+      const form = new FormData();
+      form.append('file', blob, `${sheetContext.buyerName || 'Livre'}.pdf`);
+      form.append('folderId', sheetContext.outputFolderId);
+      form.append('spreadsheetId', sheetContext.spreadsheetId);
+      form.append('rowIndex', String(sheetContext.rowIndex));
+      form.append('webhookUrl', sheetContext.webhookUrl);
+      form.append('webhookSecret', sheetContext.webhookSecret);
+      form.append('buyerName', sheetContext.buyerName);
+      const base = BACKEND_URL.replace(/\/$/, '');
+      const res = await fetch(`${base}/uploadPdf`, { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+      setErrorMessage(null);
+      alert(t.pdfSentToDrive + (data.pdfUrl ? `\n${data.pdfUrl}` : ''));
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Send to Drive failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGenerateScene = async (index: number) => {
@@ -1597,6 +1800,27 @@ const App: React.FC = () => {
 
         {(step === AppStep.INPUT || step === AppStep.CREATION) && (
           <div className="space-y-8 animate-in fade-in duration-500">
+            {fromSheetLoading && (
+              <div className="bg-amber-500/10 border border-amber-400/50 rounded-2xl p-6 text-center">
+                <i className="fas fa-spinner animate-spin text-amber-400 text-2xl mb-2"></i>
+                <p className="text-amber-200 font-bold uppercase tracking-widest text-sm">Chargement depuis la sheet...</p>
+              </div>
+            )}
+            {fromSheetError && (
+              <div className="bg-red-500/10 border border-red-400/50 rounded-2xl p-6 text-center">
+                <p className="text-red-300 font-bold">{fromSheetError}</p>
+                <p className="text-slate-400 text-sm mt-1">Réouvrez le lien depuis la sheet ou réessayez plus tard.</p>
+              </div>
+            )}
+            {sheetContext && !fromSheetLoading && !fromSheetError && step === AppStep.INPUT && (
+              <div className="bg-emerald-500/10 border border-emerald-400/50 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-emerald-200 font-bold text-sm flex-1">{t.dataLoadedFromSheet}</p>
+                <button disabled={loading} onClick={handleSheetConfirmAndGenerate} className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl uppercase text-sm tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap">
+                  {loading || isGeneratingScenes ? <i className="fas fa-spinner animate-spin"></i> : <i className="fas fa-check-double"></i>}
+                  {t.confirmAndGenerate}
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
               <div className="lg:col-span-6 space-y-8">
@@ -2096,15 +2320,21 @@ const App: React.FC = () => {
                 </div>
                 <div className="h-8 w-px bg-slate-700 hidden lg:block"></div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button onClick={() => handleDownloadPDF('SPREADS')} className="bg-green-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
                     <i className="fas fa-file-pdf"></i>
                     <span>PDF (16 Pages)</span>
                   </button>
                   <button onClick={() => handleDownloadPDF('PAGES')} className="bg-emerald-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-xl shadow-emerald-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
-                    <i className="fab fa-google-drive"></i>
+                    <i className="fas fa-file-pdf"></i>
                     <span>PDF (32 Pages)</span>
                   </button>
+                  {sheetContext && (
+                    <button onClick={handleSendToDrive} disabled={loading} className="bg-blue-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95 disabled:opacity-50">
+                      <i className="fab fa-google-drive"></i>
+                      <span>{t.sendToDrive}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 package-lock.json
+
+# Project-specific
+config.ts
+constants.ts
+storage.ts
+docs/Guide_Sheet_Content.txt
+docs/PLAN_APP_SHEET_REVIEW.md
+google-apps-script/FormHandler.gs.example
+google-apps-script/FullScript_GoogleAppsScript.gs

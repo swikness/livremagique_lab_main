@@ -67,7 +67,8 @@ Row 1 of the main sheet must contain the column headers. Data starts from row 2.
 
 - **Backend**: Deploy the `backend/` service (see [backend/README.md](../backend/README.md)). It needs `GEMINI_API_KEY` and Drive upload (service account). The backend uses the **front cover from column V** as page 1 and as the only character reference for generating the 15 story scenes and the back cover; it does not regenerate the front cover.
 - **GAS Script Properties** (Project settings → Script properties):
-  - `BACKEND_URL`: full URL of the backend, e.g. `https://your-app.run.app/createBook`.
+  - `BACKEND_URL`: full URL of the backend, e.g. `https://your-app.run.app` or `https://your-app.run.app/createBook`.
+  - `APP_URL`: required for **Ouvrir dans l'app (révision)**. The public URL of the Livre Magique Lab frontend (e.g. `https://your-app.vercel.app`).
   - `WEBHOOK_URL`: **required for book creation.** The web app URL so the backend can update the sheet (Status Livre + Livre PDF). Must be the **exec** URL (see below).
   - `WEBHOOK_SECRET`: (optional) secret so only your backend can call the update-row webhook.
 - **Publish GAS as web app**: Deploy the script as a web app (Deploy → New deployment → Web app). Execute as: Me, Who has access: Anyone. Copy the **Web app URL** (it ends in `/exec`). Paste it in Script Properties as **WEBHOOK_URL**. Without this, the backend gets 404 when it tries to update the sheet.
@@ -75,11 +76,21 @@ Row 1 of the main sheet must contain the column headers. Data starts from row 2.
 
 ## 5. Workflow summary
 
-1. New order creates a row (A–T filled). Generate the **front cover** separately and put its URL in **V (Couverture)**.
-2. Select a cell in that row → Menu **Livre Magique** → **Créer le livre pour cette ligne**.
-3. A **confirmation dialog** shows client, livre, style, language, names, etc. Click OK to send or Cancel to abort.
-4. W becomes En file, then En cours. When done, W = Généré and X = link to the **32-page PDF**.
+**Option A — Full auto (backend does everything)**  
+1. New order creates a row (A–T filled). Generate the **front cover** separately and put its URL in **V (Couverture)**.  
+2. Select a cell in that row → Menu **Livre Magique** → **Créer le livre pour cette ligne**.  
+3. A **confirmation dialog** shows client, livre, style, language, names, etc. Click OK to send or Cancel to abort.  
+4. W becomes En file, then En cours. When done, W = Généré and X = link to the **32-page PDF**.  
 5. If W = Erreur, check that V (couverture) is filled and data is correct, then try again.
+
+**Option B — Review in app, then send to Drive**  
+1. Same as above: row filled, cover in V.  
+2. Select a cell in that row → Menu **Livre Magique** → **Ouvrir dans l'app (révision)**.  
+3. Confirm in the dialog; a link opens the app with that row’s data.  
+4. In the app: check the pre-filled info, click **Confirmer et générer**. The app generates the story plan and all scene images (cover stays the one from the sheet).  
+5. Review: crop/split scenes, regenerate any scene if needed.  
+6. When everything is ready, click **Envoyer vers Drive**. The app builds the 32-page square PDF and uploads it to Drive; the sheet is updated (W = Généré, X = PDF link).  
+7. The frontend needs `VITE_BACKEND_URL` set to the backend base URL (e.g. `https://your-backend.run.app`) so it can load the session and upload the PDF.
 
 ## 6. Menu “Livre Magique” not showing
 
