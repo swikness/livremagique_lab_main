@@ -6,7 +6,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
 import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
-import { createFolder, uploadPdf } from './lib/drive.js';
+import { uploadPdf } from './lib/drive.js';
 import { buildPdf } from './lib/pdf.js';
 import { callWebhook } from './lib/webhook.js';
 
@@ -118,28 +118,21 @@ app.post('/createBook', async (req, res) => {
 
   const coverBase64 = row.coverImageBase64;
   const style = userInput.style;
+  // Two reference photos for better character consistency (same as app). Fallback to cover if only one ref.
+  const mainCharacterPhoto = row.himPhotoBase64 || userInput.photoBase64 || coverBase64;
+  const partnerPhoto = row.herPhotoBase64 || userInput.partnerPhotoBase64 || null;
 
   // Scene 0 = front cover from sheet (do not regenerate)
   plan.scenes[0].imageUrl = coverBase64;
 
-  // Create folder for the PDF (e.g. "Jean-Marie-Sophie-1234567890")
   const name1 = (row.partner1Name || 'Lui').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
   const name2 = (row.partner2Name || 'Elle').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
-  const folderName = `${name1}-${name2}-${Date.now()}`;
-  let bookFolderId;
-  try {
-    bookFolderId = await createFolder(outputFolderId, folderName);
-  } catch (e) {
-    console.error('createFolder error:', e);
-    await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
-    return res.status(500).json({ error: 'Drive folder create failed: ' + e.message });
-  }
 
   // Scenes 1–15: generate (no verification)
   for (let i = 1; i <= 15; i++) {
     const scene = plan.scenes[i];
     try {
-      scene.imageUrl = await generateSceneImage(scene, style, coverBase64, null, null);
+      scene.imageUrl = await generateSceneImage(scene, style, mainCharacterPhoto, partnerPhoto, null);
     } catch (e) {
       console.error(`generateSceneImage ${i} error:`, e);
       await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
@@ -152,7 +145,7 @@ app.post('/createBook', async (req, res) => {
   const backScene = plan.scenes[16];
   const backLogoBase64 = row.logoBase64 || null;
   try {
-    backScene.imageUrl = await generateSceneImage(backScene, style, coverBase64, null, backLogoBase64);
+    backScene.imageUrl = await generateSceneImage(backScene, style, mainCharacterPhoto, partnerPhoto, backLogoBase64);
   } catch (e) {
     console.error('generateSceneImage back cover error:', e);
     await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);
@@ -166,7 +159,7 @@ app.post('/createBook', async (req, res) => {
   let pdfUrl;
   try {
     const pdfBuffer = await buildPdf(plan, buyerName, isRTL);
-    pdfUrl = await uploadPdf(pdfBuffer, bookFolderId, pdfFileName);
+    pdfUrl = await uploadPdf(pdfBuffer, outputFolderId, pdfFileName);
   } catch (e) {
     console.error('buildPdf or uploadPdf error:', e);
     await callWebhook(webhookUrl, webhookSecret, spreadsheetId, safeRowIndex, 'Erreur', null);

@@ -57,24 +57,85 @@ export async function generateStoryPlan(input) {
     ? `Main Characters (A Couple): ${char1Info}${char2Info}. Focus the story on their romantic journey, bond, and shared experiences.`
     : `Main Character: ${char1Info}.`;
 
-  const prompt = `You are a professional book editor and world-class storyteller.
-Create a detailed 17-part story plan for a ${input.audience} book.
-${mainCharacterContext}
-Story Concept: ${input.theme}
-Themes to include: ${themesStr}
-Visual Style: ${input.style}
-Target Language for ALL TEXT: ${input.language}
-STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}. Use SHORT LINES: avoid long single-line sentences. Break text into multiple short lines so no line is too long (the image is split down the center; long lines get cropped). Prefer 2-4 words per line where possible.
+  const prompt = `
+    You are a professional book editor and world-class storyteller.
+    Create a detailed 17-part story plan for a ${input.audience} book.
+    ${mainCharacterContext}
+    Story Concept: ${input.theme}
+    Themes to include: ${themesStr}
+    Visual Style: ${input.style}
+    Target Language for ALL TEXT: ${input.language}
+    STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
 
-STRICT CHARACTER RULE: The story MUST include ONLY the two main characters (the couple). Do NOT add any other people: no friends, no family, no strangers, no background characters, no extras. Every scene shows only the man and the woman.
-PROMPT GENERATION RULE: In the 'prompt' field for scenes, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple" - NOT the names. Describe ONLY these two characters; never mention or imply other people in the image.
-NARRATIVE PERSONA: Use the Main Character's actual name (${input.name}) in storyText frequently.
+    CULTURAL CONTEXT: The story setting should reflect the visual style of the reference photos provided. Do not enforce any specific country unless obvious from the reference. Mix contemporary lifestyles with traditional touches if appropriate to the style. Keep the tone respectful and family-friendly.
 
-Return JSON: synopsis (string) and scenes (array of 17 items). Index 0 = Front Cover, 1-15 = Story scenes, 16 = Back Cover.
-For INDEX 0: title with names ${input.name} and ${input.partnerName}; prompt for cover with STYLE_INSTRUCTION placeholder.
-For INDEX 1-15: Each scene must be a DISTINCT story moment (different setting, action, or composition). Only the two main characters appear; no other people in the scene or in the prompt. Do NOT repeat the cover scene or a similar cover-like image. storyText (~${input.wordsPerScene} words in ${input.language}). In the 'prompt' use {STYLE_INSTRUCTION} and include [STORY_TEXT] where the narrative text should appear. Describe only the couple; never add background characters or extras. LAYOUT: Put the narrative text ONLY in the left 35-40% in SHORT LINES (2-4 words per line) so no line crosses the center. Put the two characters on the RIGHT half. Never put text and characters on the same side. Each scene must show a real, sharp, visible background - NO blurred panel, NO overlay color, NO solid background behind text, NO separator or divider. One continuous scene only.
-For INDEX 16: Back cover with TEXT AT THE TOP (synopsis or tagline), LOGO AT THE BOTTOM, and the two characters in the middle facing camera. Prompt must describe: text area at top, logo placement at bottom, characters in center.
-All text in ${input.language}. Return JSON only.`;
+    STRICT CHARACTER RULE: The story MUST focus EXCLUSIVELY on the defined Main Character(s). Do NOT invent any new supporting characters, parents, friends, guides, or talking animals unless they are explicitly requested in the 'Story Concept' or inputs. If the input does not mention other characters, the story must rely solely on the main protagonists and their environment. NO BACKGROUND CHARACTERS unless specified.
+
+    PROMPT GENERATION RULE: In the 'prompt' field for scenes, YOU MUST NOT use the names of the characters (like '${input.name}'). Instead, use generic terms like "The Main Character", "The Man", "The Woman", "The Couple", or "reference photo". The AI image generator does not know the names.
+
+    NARRATIVE PERSONA: You MUST frequently use the Main Character's actual name (${input.name}) in the storyText to make it feel deeply personal. Do not just say 'he' or 'she' all the time.
+
+    MISSING REFERENCE PHOTO RULE: If a new character is mentioned or required by the story/theme but NO reference photo is provided for them in the inputs:
+    1. STRICTLY LIMIT their presence. Do NOT make them a main part of the scene.
+    2. NARRATIVE: Refer to them in the third person or indirectly (e.g. "The shopkeeper smiled" instead of a full dialogue).
+    3. VISUAL PROMPTS: Describe them generically (e.g. "a silhouette", "background figure", "a friend seen from behind") and ENSURE they are NOT the focal point. Do NOT provide specific facial features for them.
+
+    Return a JSON structure containing:
+    1. A synopsis of the story (in ${input.language}).
+    2. An array of 17 components:
+       - Index 0: Front Cover
+       - Index 1 to 15: Story scenes (wide cinematic shots)
+       - Index 16: Back Cover
+
+    RULES FOR INDEX 0 (FRONT COVER):
+    - Title must reflect the relationship if it's a couple.
+    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
+      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
+      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
+    - Generate a prompt using this template:
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. Do NOT add any background, blur, or panel behind the text. COMPOSITION: Arrange the scene so there is natural negative space for the text. CHARACTERS: Do NOT describe the characters' physical appearance; use the attached reference photo(s) for how they look. Only describe pose, clothing, and placement (e.g. standing, in [outfit type], facing the camera). THEY MUST BE FACING THE CAMERA. LOGO PLACEMENT: The logo will be placed at the bottom center. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts with the background. HEADLINE TEXT: [Generated Title in ${input.language}]"
+
+    RULES FOR INDEX 1-15 (STORY SCENES):
+    - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
+    - Generate a 'prompt' using this EXACT TEMPLATE:
+      "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}.
+      COMPOSITION RULE: STRICT SIDE-BY-SIDE LAYOUT.
+      - You MUST choose ONE of these two layouts for this scene:
+          Option A: [Characters on LEFT side] + [Uncluttered Background on RIGHT side for Text]
+          Option B: [Characters on RIGHT side] + [Uncluttered Background on LEFT side for Text]
+      - CENTER SAFETY: The exact vertical center (50%) is the book spine. Do NOT place important faces or text here.
+      - TEXT: Do NOT add any background, blur, panel, or color block behind the text. Place the text over a part of the scene (e.g. open sky, distant landscape). The scene must be one continuous image; text is overlaid with no separate area behind it.
+      - Do NOT describe the characters' faces or bodies in the prompt; the reference photo(s) define their appearance. Only describe pose, clothing, and placement.
+
+      CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave margin around the characters' heads and arms. Do NOT cut them off at the edge.
+      [Further scene details].
+      LAYOUT: Maintain a seamless continuous background across the entire width.
+      TEXT PLACEMENT: Place the text away from the EXACT VERTICAL CENTER (spine) and the outer edges. Do not add any background behind the text.
+      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a SIMPLE, CLEAN, STANDARD FONT (like Serif or Sans-Serif) that is highly readable. Do NOT use cursive, handwriting, or fancy decorative fonts. The font style must be consistent across all scenes.
+      TEXT: [STORY_TEXT]"
+
+    RULES FOR INDEX 16 (BACK COVER):
+    - Summary of the book (in ${input.language}).
+    - Title of the book mentioned.
+    - PROMPT INSTRUCTION:
+      "Design a clean, elegant Back Cover.
+      COMPOSITION:
+      - TOP AREA: Reserved for the SYNOPSIS text. Background must be uncluttered (sky, soft texture).
+      - CENTER AREA: The main characters (Front View) looking at the camera, waving goodbye or smiling warmly.
+      - BOTTOM AREA: Reserved for the BRAND MESSAGE. Background must be uncluttered.
+
+      TEXT INSTRUCTION:
+      1. AT THE TOP: Render this EXACT Synopsis text: \\"[Insert the generated Synopsis here]\\"
+      2. AT THE BOTTOM: Render this EXACT Brand Message: \\"[Insert the generated Brand Message here]\\"
+
+      CRITICAL: You MUST write the actual synopsis text and brand message text in the image. Do not use placeholders."
+    - CRITICAL: Characters MUST BE FACING THE CAMERA (Front View).
+
+    CRITICAL: All content within 'synopsis', 'title', 'storyText', and 'HEADLINE TEXT' must be written in ${input.language}.
+    Return JSON format.
+  `;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -111,33 +172,37 @@ export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, p
   const singleReference = mainCharacterPhoto && !partnerPhoto;
   const refInstruction = singleReference
     ? 'CHARACTER CONSISTENCY: The two characters must look EXACTLY like the attached reference image in every detail (faces, features, hair). Use the same reference for both the man and the woman. Same couple, same faces, no variation between scenes.'
-    : 'CHARACTER CONSISTENCY: The two characters must look EXACTLY like the attached reference photos. Same faces, same features, same couple in every scene. Do not deviate from the reference.';
+    : 'You have two reference photos: use the first for the main character and the second for the partner. CHARACTER CONSISTENCY: Both characters must look EXACTLY like their attached reference photo. Same faces, same features, same couple in every scene. Do not deviate from the reference.';
 
   const isStoryScene = scene.id >= 1 && scene.id <= 15;
   const isBackCover = scene.id === 16 || scene.type === 'back-cover';
   const safeZoneRules = isStoryScene
-    ? `LAYOUT - TEXT AND CHARACTERS ON OPPOSITE SIDES: Put the narrative text ONLY in the LEFT 40% of the image (strictly left of center). Put the two characters on the RIGHT half. No word, line, or letter may cross the center line - the image is split down the center for the book spine, so any text that crosses will be cut in half. Keep all text in a narrow block on the left (e.g. left 35-40% of width); wrap long lines so they stay left of center. Do NOT put text and characters on the same side. Fill the entire frame; no white space. TYPOGRAPHY: Same font style, size, and weight. No italics, no varying sizes.`
+    ? `LAYOUT: Keep narrative text away from the exact vertical center (book spine). Do NOT add any background, blur, or panel behind the text. Fill the entire frame; no white space. TYPOGRAPHY: Same font style, size, and weight throughout. No italics, no varying sizes.`
     : '';
 
   const backCoverRules = isBackCover
     ? 'BACK COVER LAYOUT: Text (synopsis or tagline) at the TOP. Logo at the BOTTOM center. The two characters in the MIDDLE facing camera. Fill the frame; no white space.'
     : '';
 
-  const backgroundRules = `BACKGROUND - NO BLUR, NO OVERLAY, NO SEPARATOR: The entire image must be ONE continuous, sharp, visible scene (setting, environment, details). Do NOT use a blurred panel, blurry area, or full blur behind the text. Do NOT use any overlay color, tint, or solid background color behind the text. Do NOT add a separator, divider, panel edge, or distinct block between text and scene. The scene must be one continuous image with no hard edges. For text readability use ONLY a very subtle shadow or soft glow on the letters themselves - nothing behind the text (no blur, no color block). The background must be fully visible and sharp everywhere.`;
+  const backgroundRules = `CRITICAL - NO BACKGROUND FOR TEXT: Do NOT add any background behind the text. No blur, no semi-transparent panel, no solid color, no tint, no gradient, no text box. The entire image must be ONE continuous, sharp scene. For text readability use ONLY a very subtle shadow or outline on the letters themselves - nothing behind the text. The scene must be fully visible and sharp everywhere.`;
 
   const parts = [
     {
       text: `${finalPrompt}
+FACIAL CONSISTENCY: The faces of the characters must strictly match the attached facial reference photos.
 ${refInstruction}
+ORIENTATION RULE: Characters must be facing the FRONT/CAMERA as much as possible to ensure likeness visibility.
+SIDE CHARACTER RULE: If there are other characters mentioned who are NOT the main protagonists, they must be facing AWAY from the camera or have their faces obscured/blurred/in shadow. Only the Main Characters (whose photos are attached) should have visible faces.
 ONLY TWO CHARACTERS: Show ONLY the couple (the man and the woman from the reference). No other people, no background characters, no extras, no strangers. The image must contain exactly these two characters and nothing else human.
-ORIENTATION RULE: Characters must be facing the FRONT/CAMERA.
 CLOTHING RULE: Do NOT use the clothing from the reference photos. Only use the clothing described in the prompt.
-IMAGE QUALITY: The image MUST be sharp, in focus, and high detail everywhere except optional subtle shadow/glow behind text only. No full blur, no motion blur. The scene must be visible and continuous. Fill the entire frame; no white space, no empty areas, no blank margins.
+TEXT RENDERING: If the prompt contains a TEXT: instruction, you MUST render that text exactly as written, clearly and elegantly within the image as described.
+SAFETY MARGINS: Ensure the characters are fully visible with space above their heads and around their arms. Do NOT cut off features at the edge. ZOOM OUT slightly if needed. NO BORDERS. NO FRAMES. RENDER THE SCENE DIRECTLY.
+IMAGE QUALITY: The image MUST be sharp, in focus, and high detail everywhere. Fill the entire frame; no white space, no empty areas, no blank margins.
 ${backgroundRules}
 ${isStoryScene ? 'SCENE RULE: This is a story scene illustration, NOT the book cover. Create a clearly different composition, setting, and moment from the cover.' : ''}
 ${safeZoneRules}
 ${backCoverRules}
-TEXT RENDERING: Render story text in SHORT LINES (2-4 words per line) so no long line crosses the center. Same font style and size throughout. Full visibility, no cut-off. NO BORDERS.`,
+TYPOGRAPHY: Same font style and size throughout. Full visibility, no cut-off.`,
     },
   ];
 
