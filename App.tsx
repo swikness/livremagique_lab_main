@@ -383,7 +383,7 @@ const App: React.FC = () => {
         if (!res.ok) throw new Error(res.status === 404 ? 'Session expired or not found' : `Error ${res.status}`);
         return res.json();
       })
-      .then((data: { userInput: UserInput; theme: string; coverBase64: string | null; coverOnly?: boolean; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
+      .then((data: { userInput: UserInput & { loversStoryType?: string; customNote?: string }; theme: string; coverBase64: string | null; coverOnly?: boolean; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
         setUserInput({ ...data.userInput, theme: data.theme });
         setSheetCoverBase64(data.coverBase64 || null);
         setSheetCoverOnlyMode(!!data.coverOnly);
@@ -396,6 +396,18 @@ const App: React.FC = () => {
           webhookSecret: data.webhookSecret || '',
           buyerName: data.buyerName || 'Livre',
         });
+        // Pre-fill book title (story type), for him/her, years, and options from sheet
+        const storyType = data.userInput.loversStoryType
+          || (data.theme && data.theme.includes('CUSTOM_STORY') ? 'CUSTOM_STORY' : null)
+          || (data.theme && data.theme.includes('LOVE_STORY') ? 'LOVE_STORY' : null)
+          || (data.theme && data.theme.includes('BUCKET_LIST') ? 'BUCKET_LIST' : null)
+          || '10_REASONS';
+        setLoversStoryType(storyType as LoversStoryType);
+        setRecipientType((data.userInput.recipient === 'HIM' ? 'HIM' : 'HER') as RecipientType);
+        setSelectedYearsCount(data.userInput.yearsCount || '2');
+        setSelectedOptions(Array.isArray(data.userInput.selectedThemes) && data.userInput.selectedThemes.length > 0 ? data.userInput.selectedThemes : (storyType === '10_REASONS' ? ['Amour'] : []));
+        setCustomStoryTitle(data.userInput.customTitle || '');
+        setCustomStorySynopsis(data.userInput.customNote || '');
       })
       .catch((e: Error) => setFromSheetError(e.message || 'Failed to load session'))
       .finally(() => setFromSheetLoading(false));

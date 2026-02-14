@@ -76,4 +76,8 @@ export interface UserInput {
   recipient?: 'HER' | 'HIM';
   /** From sheet: custom book title (column M); used for Sur Mesure cover */
   customTitle?: string;
+  /** From sheet: custom note (column N); used for Sur Mesure synopsis */
+  customNote?: string;
+  /** From sheet: book type for UI (Livre 1–4); inferred from bookName */
+  loversStoryType?: '10_REASONS' | 'LOVE_STORY' | 'BUCKET_LIST' | 'CUSTOM_STORY';
 }

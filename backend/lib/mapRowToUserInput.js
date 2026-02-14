@@ -78,6 +78,12 @@ export function mapRowToUserInput(row) {
     yearsCount: years || undefined,
     recipient: (row.recipient || 'HER').toUpperCase() === 'HIM' ? 'HIM' : 'HER',
     customTitle,
+    customNote: customNote || undefined,
+    /** Book type for app UI: 10_REASONS | LOVE_STORY | BUCKET_LIST | CUSTOM_STORY */
+    loversStoryType: bookName.includes("Sur Mesure") || bookName.includes("100%") ? 'CUSTOM_STORY'
+      : bookName.includes("Années") || bookName.includes("Amour") ? 'LOVE_STORY'
+      : bookName.includes("Liste") || bookName.includes("Rêves") ? 'BUCKET_LIST'
+      : '10_REASONS',
   };
 
   return { userInput, theme };
