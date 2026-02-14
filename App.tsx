@@ -424,6 +424,7 @@ const App: React.FC = () => {
   // Quick Cover State
   const [quickCoverVisible, setQuickCoverVisible] = useState(false);
   const [quickCoverScene, setQuickCoverScene] = useState<Scene | null>(null);
+  const [quickCoverHistory, setQuickCoverHistory] = useState<{ imageUrl: string; title?: string }[]>([]);
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
   const [quickCoverCustomInstructions, setQuickCoverCustomInstructions] = useState<string>('');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
@@ -972,6 +973,12 @@ const App: React.FC = () => {
         logoBase64 // Include logo for consistency with main story
       );
 
+      setQuickCoverHistory(prev => {
+        if (quickCoverScene?.imageUrl) {
+          return [...prev, { imageUrl: quickCoverScene.imageUrl, title: quickCoverScene.title }];
+        }
+        return prev;
+      });
       setQuickCoverScene({ ...coverScene, imageUrl: img, status: 'done' });
     } catch (e: any) {
       console.error(e);
@@ -2261,6 +2268,42 @@ const App: React.FC = () => {
                     {quickCoverLoading ? <i className="fas fa-spinner animate-spin"></i> : <i className="fas fa-magic"></i>}
                     {quickCoverLoading ? 'Generating...' : 'Generate Cover'}
                   </button>
+
+                  {/* Previous designs thumbnails (same session) */}
+                  {(quickCoverHistory.length > 0 || (quickCoverScene?.imageUrl && !quickCoverLoading)) && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Designs this session</p>
+                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                        {quickCoverHistory.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setQuickCoverScene({
+                              id: 0,
+                              type: 'front-cover',
+                              title: item.title || 'Cover',
+                              description: 'Front Cover',
+                              prompt: '',
+                              storyText: '',
+                              history: [],
+                              status: 'done',
+                              aspectRatio: '1:1',
+                              generationRatio: '1:1',
+                              imageUrl: item.imageUrl
+                            })}
+                            className="shrink-0 w-16 h-16 rounded-xl border-2 border-slate-600 hover:border-amber-400 overflow-hidden bg-black transition-colors"
+                          >
+                            <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                        {quickCoverScene?.imageUrl && !quickCoverLoading && (
+                          <div className="shrink-0 w-16 h-16 rounded-xl border-2 border-amber-400 overflow-hidden bg-black ring-2 ring-amber-400/50" title="Current">
+                            <img src={quickCoverScene.imageUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Preview Area */}
                   {(quickCoverScene?.imageUrl || quickCoverLoading) && (
