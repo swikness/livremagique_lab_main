@@ -98,6 +98,9 @@ const TRANSLATIONS = {
     confirmAndGenerate: "Confirmer et générer",
     sendToDrive: "Envoyer vers Drive",
     pdfSentToDrive: "PDF envoyé vers Drive. La sheet a été mise à jour.",
+    sendConfirm: "Confirmer et envoyer",
+    coverSentToDrive: "Couverture envoyée vers Drive. La sheet a été mise à jour (colonne V).",
+    dataLoadedFromSheetCover: "Générez la couverture ci-dessous puis cliquez sur Confirmer et envoyer pour enregistrer le lien en colonne V.",
   },
   English: {
     appTitle: "Magical Book Lab",
@@ -163,6 +166,9 @@ const TRANSLATIONS = {
     confirmAndGenerate: "Confirm & Generate",
     sendToDrive: "Send to Drive",
     pdfSentToDrive: "PDF sent to Drive. Sheet has been updated.",
+    sendConfirm: "Send confirm",
+    coverSentToDrive: "Cover sent to Drive. Sheet updated (column V).",
+    dataLoadedFromSheetCover: "Generate the cover below then click Send confirm to save the link in column V.",
   }
 };
 
@@ -377,9 +383,11 @@ const App: React.FC = () => {
         if (!res.ok) throw new Error(res.status === 404 ? 'Session expired or not found' : `Error ${res.status}`);
         return res.json();
       })
-      .then((data: { userInput: UserInput; theme: string; coverBase64: string; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
+      .then((data: { userInput: UserInput; theme: string; coverBase64: string | null; coverOnly?: boolean; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
         setUserInput({ ...data.userInput, theme: data.theme });
-        setSheetCoverBase64(data.coverBase64);
+        setSheetCoverBase64(data.coverBase64 || null);
+        setSheetCoverOnlyMode(!!data.coverOnly);
+        if (data.coverOnly) setQuickCoverVisible(true);
         setSheetContext({
           outputFolderId: data.outputFolderId,
           spreadsheetId: data.spreadsheetId,
@@ -411,6 +419,7 @@ const App: React.FC = () => {
   // Sheet-to-app (from-sheet) state
   const [sheetContext, setSheetContext] = useState<SheetContext | null>(null);
   const [sheetCoverBase64, setSheetCoverBase64] = useState<string | null>(null);
+  const [sheetCoverOnlyMode, setSheetCoverOnlyMode] = useState(false);
   const [fromSheetLoading, setFromSheetLoading] = useState(false);
   const [fromSheetError, setFromSheetError] = useState<string | null>(null);
 
@@ -1353,6 +1362,36 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSendCoverToDrive = async () => {
+    if (!sheetContext || !quickCoverScene?.imageUrl) return;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(quickCoverScene.imageUrl);
+      const blob = await res.blob();
+      const form = new FormData();
+      form.append('file', blob, `${sheetContext.buyerName || 'Couverture'}-cover.png`);
+      form.append('folderId', sheetContext.outputFolderId);
+      form.append('spreadsheetId', sheetContext.spreadsheetId);
+      form.append('rowIndex', String(sheetContext.rowIndex));
+      form.append('webhookUrl', sheetContext.webhookUrl);
+      form.append('webhookSecret', sheetContext.webhookSecret);
+      form.append('buyerName', sheetContext.buyerName);
+      const base = BACKEND_URL.replace(/\/$/, '');
+      const r = await fetch(`${base}/uploadCover`, { method: 'POST', body: form });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(data.error || `Error ${r.status}`);
+      }
+      setErrorMessage(null);
+      alert(t.coverSentToDrive + (data.coverUrl ? `\n${data.coverUrl}` : ''));
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Send cover failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerateScene = async (index: number) => {
     if (!storyPlan) return;
     const newScenes = [...storyPlan.scenes];
@@ -1812,13 +1851,18 @@ const App: React.FC = () => {
                 <p className="text-slate-400 text-sm mt-1">Réouvrez le lien depuis la sheet ou réessayez plus tard.</p>
               </div>
             )}
-            {sheetContext && !fromSheetLoading && !fromSheetError && step === AppStep.INPUT && (
+            {sheetContext && !fromSheetLoading && !fromSheetError && step === AppStep.INPUT && !sheetCoverOnlyMode && (
               <div className="bg-emerald-500/10 border border-emerald-400/50 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-emerald-200 font-bold text-sm flex-1">{t.dataLoadedFromSheet}</p>
                 <button disabled={loading} onClick={handleSheetConfirmAndGenerate} className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl uppercase text-sm tracking-widest hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap">
                   {loading || isGeneratingScenes ? <i className="fas fa-spinner animate-spin"></i> : <i className="fas fa-check-double"></i>}
                   {t.confirmAndGenerate}
                 </button>
+              </div>
+            )}
+            {sheetContext && sheetCoverOnlyMode && !fromSheetLoading && !fromSheetError && step === AppStep.INPUT && (
+              <div className="bg-amber-500/10 border border-amber-400/50 rounded-2xl p-6">
+                <p className="text-amber-200 font-bold text-sm">{t.dataLoadedFromSheetCover}</p>
               </div>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -2218,13 +2262,21 @@ const App: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Download Button Overlay */}
+                      {/* Download / Send confirm Button Overlay */}
                       {quickCoverScene?.imageUrl && !quickCoverLoading && (
-                        <div className="absolute inset-x-0 bottom-0 p-4 bg-slate-900/90 backdrop-blur flex justify-between items-center">
+                        <div className="absolute inset-x-0 bottom-0 p-4 bg-slate-900/90 backdrop-blur flex flex-wrap justify-between items-center gap-2">
                           <span className="text-[10px] text-white font-bold truncate max-w-[60%]">{quickCoverScene.title}</span>
-                          <button onClick={handleQuickCoverDownload} className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-[10px] uppercase hover:bg-slate-200 transition-colors">
-                            <i className="fas fa-download mr-1"></i> Download
-                          </button>
+                          <div className="flex gap-2">
+                            {sheetCoverOnlyMode && sheetContext && (
+                              <button onClick={handleSendCoverToDrive} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase hover:bg-blue-500 disabled:opacity-50 transition-colors flex items-center gap-1">
+                                {loading ? <i className="fas fa-spinner animate-spin"></i> : <i className="fab fa-google-drive"></i>}
+                                {t.sendConfirm}
+                              </button>
+                            )}
+                            <button onClick={handleQuickCoverDownload} className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-[10px] uppercase hover:bg-slate-200 transition-colors">
+                              <i className="fas fa-download mr-1"></i> Download
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

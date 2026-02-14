@@ -9,7 +9,7 @@ import multer from 'multer';
 import { google } from 'googleapis';
 import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
 import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
-import { uploadPdf } from './lib/drive.js';
+import { uploadPdf, uploadImage } from './lib/drive.js';
 import { buildPdf } from './lib/pdf.js';
 import { callWebhook } from './lib/webhook.js';
 
@@ -132,6 +132,49 @@ app.post('/sheet/prepare', (req, res) => {
   res.status(200).json({ sessionId });
 });
 
+// --- Sheet-to-app: prepare cover-only session (no existing cover required) ---
+app.post('/sheet/prepareCover', (req, res) => {
+  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret } = req.body || {};
+  if (!row || !outputFolderId || !spreadsheetId || rowIndex == null) {
+    return res.status(400).json({
+      error: 'Missing required fields: row, outputFolderId, spreadsheetId, rowIndex',
+    });
+  }
+  const safeRowIndex = parseInt(rowIndex, 10);
+  if (safeRowIndex < 2) {
+    return res.status(400).json({ error: 'rowIndex must be >= 2' });
+  }
+  let userInput;
+  let theme;
+  try {
+    const mapped = mapRowToUserInput(row);
+    userInput = mapped.userInput;
+    theme = mapped.theme;
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid row data: ' + e.message });
+  }
+  purgeExpiredSessions();
+  const sessionId = crypto.randomUUID();
+  const name1 = (row.partner1Name || 'Lui').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
+  const name2 = (row.partner2Name || 'Elle').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
+  const buyerName = (row.buyerName || `${name1}-${name2}`).replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Livre';
+  sheetSessions.set(sessionId, {
+    row,
+    outputFolderId,
+    spreadsheetId,
+    rowIndex: safeRowIndex,
+    webhookUrl: webhookUrl || '',
+    webhookSecret: webhookSecret || '',
+    userInput,
+    theme,
+    coverBase64: null,
+    coverOnly: true,
+    buyerName,
+    createdAt: Date.now(),
+  });
+  res.status(200).json({ sessionId });
+});
+
 // --- Sheet-to-app: fetch session (app loads with ?fromSheet=sessionId) ---
 app.get('/sheet/session/:id', (req, res) => {
   purgeExpiredSessions();
@@ -143,6 +186,7 @@ app.get('/sheet/session/:id', (req, res) => {
     userInput: data.userInput,
     theme: data.theme,
     coverBase64: data.coverBase64,
+    coverOnly: data.coverOnly || false,
     outputFolderId: data.outputFolderId,
     spreadsheetId: data.spreadsheetId,
     rowIndex: data.rowIndex,
@@ -296,6 +340,41 @@ app.post('/uploadPdf', upload.single('file'), async (req, res) => {
     console.warn('Webhook failed:', e.message);
   }
   res.status(200).json({ success: true, pdfUrl });
+});
+
+// --- Sheet-to-app: app uploads generated cover image, backend uploads to Drive and updates sheet col V ---
+app.post('/uploadCover', upload.single('file'), async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: 'Missing cover image file' });
+  }
+  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName } = req.body || {};
+  if (!folderId || !spreadsheetId || rowIndex == null) {
+    return res.status(400).json({
+      error: 'Missing required fields: folderId, spreadsheetId, rowIndex',
+    });
+  }
+  const safeRowIndex = parseInt(rowIndex, 10);
+  if (safeRowIndex < 2) {
+    return res.status(400).json({ error: 'rowIndex must be >= 2' });
+  }
+  const baseName = (buyerName && typeof buyerName === 'string')
+    ? String(buyerName).replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Couverture'
+    : 'Couverture';
+  const fileName = `${baseName}-cover.png`;
+  const mimeType = req.file.mimetype || 'image/png';
+  let coverUrl;
+  try {
+    coverUrl = await uploadImage(folderId, req.file.buffer, fileName, mimeType);
+  } catch (e) {
+    console.error('uploadImage (cover) error:', e);
+    return res.status(500).json({ error: 'Drive upload failed: ' + e.message });
+  }
+  try {
+    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, null, null, coverUrl);
+  } catch (e) {
+    console.warn('Webhook (cover) failed:', e.message);
+  }
+  res.status(200).json({ success: true, coverUrl });
 });
 
 app.get('/health', (req, res) => {
