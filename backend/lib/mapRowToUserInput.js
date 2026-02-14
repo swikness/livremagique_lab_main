@@ -41,8 +41,9 @@ export function mapRowToUserInput(row) {
   const bookName = String(row.bookName || '').trim();
   const years = String(row.years || '2').trim();
   const customNote = String(row.customNote || '').trim();
+  const customTitle = String(row.customTitle || '').trim() || undefined;
   // Column O (optionsList) = scenes description / what the book is about, for ALL book types including Sur Mesure.
-  // Column M (customTitle) is for the cover title only — not used in story theme.
+  // Column M (customTitle) = cover title for Sur Mesure; also passed so cover generator uses it.
 
   const scenesDescription = optionsList || (options.length ? options.join(', ') : '');
   const scenesDescForTheme = scenesDescription || 'Our love story';
@@ -75,6 +76,8 @@ export function mapRowToUserInput(row) {
     language,
     wordsPerScene: 15,
     yearsCount: years || undefined,
+    recipient: (row.recipient || 'HER').toUpperCase() === 'HIM' ? 'HIM' : 'HER',
+    customTitle,
   };
 
   return { userInput, theme };

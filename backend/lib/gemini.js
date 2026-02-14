@@ -56,6 +56,11 @@ export async function generateStoryPlan(input) {
   const mainCharacterContext = input.audience === 'Lovers'
     ? `Main Characters (A Couple): ${char1Info}${char2Info}. Focus the story on their romantic journey, bond, and shared experiences.`
     : `Main Character: ${char1Info}.`;
+  const raisonsRecipientName = input.recipient === 'HIM' ? input.name : (input.partnerName || input.name);
+  const yearsForTitle = input.yearsCount || '2';
+  const customTitleLine = input.customTitle
+    ? `\n      4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Title MUST be exactly "${input.customTitle}".`
+    : '';
 
   const prompt = `
     You are a professional book editor and world-class storyteller.
@@ -90,10 +95,10 @@ export async function generateStoryPlan(input) {
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
-      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
-      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
-      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
-    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
+      1. IF Theme is '10 Reasons to Love You' or 'Raisons d\'Aimer': Title MUST be exactly "RAISONS POUR LESQUELLES JE T'AIME ${raisonsRecipientName}" (recipient's name). Do NOT add any number (no "10", no digit) before "RAISONS"—the title must start with the word RAISONS only.
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${yearsForTitle} ANS D'AMOUR DEJA" (use the years value provided). Do NOT use a fixed number.
+      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".${customTitleLine}
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title (except when a custom title is provided).
     - Generate a prompt using this template:
       "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. Do NOT add any background, blur, or panel behind the text. COMPOSITION: Arrange the scene so there is natural negative space for the text. CHARACTERS: Do NOT describe the characters' physical appearance; use the attached reference photo(s) for how they look. Only describe pose, clothing, and placement (e.g. standing, in [outfit type], facing the camera). THEY MUST BE FACING THE CAMERA. LOGO PLACEMENT: The logo will be placed at the bottom center. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts with the background. HEADLINE TEXT: [Generated Title in ${input.language}]"
 

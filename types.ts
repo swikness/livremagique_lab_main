@@ -72,4 +72,8 @@ export interface UserInput {
   language: string;
   wordsPerScene: number;
   yearsCount?: string;
+  /** From sheet: book is for HER (Elle) or HIM (Lui); used for Raisons cover title */
+  recipient?: 'HER' | 'HIM';
+  /** From sheet: custom book title (column M); used for Sur Mesure cover */
+  customTitle?: string;
 }

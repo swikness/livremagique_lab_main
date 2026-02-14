@@ -78,6 +78,9 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   const mainCharacterContext = input.audience === TargetAudience.LOVERS
     ? `Main Characters (A Couple): ${char1Info}${char2Info}. Focus the story on their romantic journey, bond, and shared experiences.`
     : `Main Character: ${char1Info}.`;
+  const raisonsRecipientName = input.recipient === 'HIM' ? input.name : (input.partnerName || input.name);
+  const yearsForTitle = input.yearsCount || '2';
+  const customTitleLine = input.customTitle ? `\n      4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Title MUST be exactly "${input.customTitle}".` : '';
 
   const prompt = `
     You are a professional book editor and world-class storyteller. 
@@ -113,10 +116,10 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
     - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
-      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
-      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : DEUX ANS D'AMOUR DEJA" (or similar relevant duration).
-      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
-    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title.
+      1. IF Theme is '10 Reasons to Love You' or 'Raisons d'Aimer': Title MUST be exactly "RAISONS POUR LESQUELLES JE T'AIME ${raisonsRecipientName}" (recipient's name). Do NOT add any number (no "10", no digit) before "RAISONS"—the title must start with the word RAISONS only.
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${yearsForTitle} ANS D'AMOUR DEJA" (use the years value provided, e.g. ${yearsForTitle}). Do NOT use a fixed number.
+      3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".${customTitleLine}
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title (except when a custom title is provided).
     - Generate a prompt using this template:
       "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
@@ -203,6 +206,12 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
     : `Main Character: ${char1Info}.`;
 
   const customInstructionText = customInstructions ? `\n\nADDITIONAL CUSTOM INSTRUCTIONS: ${customInstructions}. You MUST incorporate these instructions into the cover design.` : '';
+  // Raisons: use recipient from sheet — book FOR her = her name in title, FOR him = his name
+  const raisonsRecipientName = input.recipient === 'HIM' ? input.name : (input.partnerName || input.name);
+  const yearsForTitle = input.yearsCount || '2';
+  const customTitleRule = input.customTitle
+    ? `4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Title MUST be exactly "${input.customTitle}". Use this as the headline text. The visual composition MUST directly represent the synopsis provided.`
+    : `4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Extract the Book Title from the theme and use it as the cover title. The visual composition MUST directly represent the synopsis provided - include specific visual elements, settings, and atmosphere that tell the story just from looking at the cover.`;
 
   const prompt = `
     You are a professional book cover designer.
@@ -216,11 +225,11 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
     RULES FOR FRONT COVER:
     - Title must reflect the relationship if it's a couple.
     - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type (if known, otherwise invent a magical title):
-      1. IF Theme is '10 Reasons to Love You': Title MUST be "RAISONS POUR LESQUELLES JE T'AIME ${input.partnerName || input.name}" (or whichever name is the recipient).
-      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${input.yearsCount || '2'} ANS D'AMOUR DEJA" (or similar relevant duration).
+      1. IF Theme is '10 Reasons to Love You' or 'Raisons d'Aimer': Title MUST be exactly "RAISONS POUR LESQUELLES JE T'AIME ${raisonsRecipientName}" (recipient's name). Do NOT add any number (no "10", no digit) before "RAISONS"—the title must start with the word RAISONS only.
+      2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${yearsForTitle} ANS D'AMOUR DEJA" (use ${yearsForTitle} years from the sheet). Do NOT use a fixed number—use the years value provided.
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".
-      4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Extract the Book Title from the theme and use it as the cover title. The visual composition MUST directly represent the synopsis provided - include specific visual elements, settings, and atmosphere that tell the story just from looking at the cover.
-    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title if it's a Lovers book.
+      ${customTitleRule}
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title if it's a Lovers book (except when a custom title is provided).
     
     SPECIAL INSTRUCTIONS FOR CUSTOM STORIES:
     - If the theme mentions "Custom Story" or "Synopsis:", you MUST analyze the synopsis and create a cover that VISUALLY TELLS THE STORY.
