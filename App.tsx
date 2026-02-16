@@ -107,7 +107,7 @@ const TRANSLATIONS = {
     storyTemplate: "Modèle d'histoire",
     ramadanTitle: (name: string, _gender: string) => `${name || '[Nom]'} et les Valeurs du Ramadan`,
     numberOfScenes: "Nombre de scènes",
-    ramadanPagesNote: "6 scènes (histoire fixe)",
+    ramadanPagesNote: `${RAMADAN_INNER_SCENES} scènes (histoire fixe)`,
     customStory: "Histoire personnalisée",
   },
   English: {
@@ -180,7 +180,7 @@ const TRANSLATIONS = {
     storyTemplate: "Story Template",
     ramadanTitle: (name: string, _gender: string) => `${name || '[Name]'} and the Values of Ramadan`,
     numberOfScenes: "Number of scenes",
-    ramadanPagesNote: "6 story pages (fixed story)",
+    ramadanPagesNote: `${RAMADAN_INNER_SCENES} story pages (fixed story)`,
     customStory: "Custom story",
   }
 };
