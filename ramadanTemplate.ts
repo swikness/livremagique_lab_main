@@ -95,8 +95,8 @@ const COVER_TITLE: Record<Lang, string> = {
   Spanish: '{{name}} y los Valores del Ramadán',
 };
 
-/** Front cover image prompt: only the child, Ramadan feel via setting. */
-const COVER_PROMPT = `{STYLE_INSTRUCTION} COMPOSITION: A warm, welcoming scene for a children's book. The Main Character (a child) is the ONLY person in the frame, standing or sitting in a cozy interior or soft outdoor setting with subtle Ramadan atmosphere (e.g. soft lights, a calendar or moon motif in the background, warm colors). No other people. TEXT PLACEMENT: The title text must be placed on a CLEAN, UNCLUTTERED area. Leave natural negative space for the text. CHARACTERS: Only "The Main Character" (the child from the reference photo), facing the camera, in comfortable modest clothing. ${SINGLE_CHARACTER_RULE} LOGO PLACEMENT: Space at the bottom center for the logo. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. The text must contrast with the background. HEADLINE TEXT: [TITLE_PLACEHOLDER]`;
+/** Front cover image prompt: only the child, Ramadan + Moroccan atmosphere; decorative items on the sides. */
+const COVER_PROMPT = `{STYLE_INSTRUCTION} COMPOSITION: A warm, welcoming scene for a children's book with a rich Moroccan Ramadan atmosphere. The Main Character (a child) is the ONLY person in the frame, standing or sitting in the center, in a cozy interior or soft outdoor setting. On the SIDES of the frame (left and/or right), add attractive decorative elements: a Moroccan tabla (round metal tray) with chbakia (honey-sesame cookies), dates in a small bowl, a teapot and mint-tea glasses, optional lantern (fanous) or subtle crescent-moon motif—elegant and inviting, not cluttered. Soft lights, warm amber and terracotta tones, a calendar or moon motif in the background. No other people. TEXT PLACEMENT: The title text must be placed on a CLEAN, UNCLUTTERED area (e.g. above or below the child). Leave natural negative space for the text. CHARACTERS: Only "The Main Character" (the child from the reference photo), facing the camera, in comfortable modest clothing. ${SINGLE_CHARACTER_RULE} LOGO PLACEMENT: Space at the bottom center for the logo. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. The text must contrast with the background. HEADLINE TEXT: [TITLE_PLACEHOLDER]`;
 
 /** Back cover image prompt: only the child waving/smiling. {{SYNOPSIS}} is replaced with the actual story synopsis. */
 const BACK_COVER_PROMPT_TEMPLATE = `Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Uncluttered background. Render this EXACT text at the top. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. Text: "{{SYNOPSIS}}" CENTER AREA: Only The Main Character (the child from the reference photo), front view, facing the camera, waving goodbye or smiling warmly. ${SINGLE_CHARACTER_RULE} BOTTOM AREA: Leave uncluttered or minimal space for a logo; do NOT add any other text or brand message.`;
@@ -206,7 +206,7 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
   // 3: First suhoor (gratitude – shukr)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a kitchen or dining nook at dawn, with a simple suhoor setting (dates, water, gentle light). Early morning atmosphere. The child is the only person in the scene.',
+      'Scene: A child in a kitchen or dining nook at NIGHT TIME, moments before sunrise (pre-dawn suhoor). The table is set in Moroccan style: a Moroccan tabla (round metal tray), dates in a small bowl, water, chbakia or other Moroccan pastries, mint tea optional. Soft, dim pre-dawn lighting—one warm lamp or candlelight, dark blue/navy through the window, no bright daylight. Peaceful, intimate atmosphere. The child is the only person in the scene.',
       'LEFT'
     ),
     content: {
@@ -239,7 +239,7 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
   // 4: First iftar (gratitude at breaking the fast)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a dining area at dusk, table set for iftar with dates, water and simple dishes. Warm evening light. The child is alone at the table, smiling, as if about to break the fast. Only the child in frame.',
+      'Scene: A child in a dining area at dusk, table set for iftar in Moroccan style: Moroccan tabla (round metal tray), dates in a bowl, water, chbakia (honey-sesame cookies), mint tea in a teapot with glasses, optional harira or pastries. Warm evening light. The child is alone at the table, smiling, as if about to break the fast. Only the child in frame.',
       'RIGHT'
     ),
     content: {

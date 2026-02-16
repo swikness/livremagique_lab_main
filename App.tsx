@@ -979,8 +979,9 @@ const App: React.FC = () => {
         if (!customStorySynopsis.trim()) missing.push(t.customStorySynopsis);
       }
     } else {
-      // For Kids/Adults, require a theme
-      if (!userInput.theme.trim()) missing.push(t.storyBlueprint);
+      // For Kids/Adults, require a theme (except Ramadan template which has a fixed story)
+      const isRamadanKids = userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN';
+      if (!isRamadanKids && !userInput.theme.trim()) missing.push(t.storyBlueprint);
     }
 
     if (missing.length > 0) {
@@ -990,28 +991,35 @@ const App: React.FC = () => {
 
     setQuickCoverLoading(true);
     try {
-      // Determine effective theme based on audience
-      let effectiveTheme = userInput.theme;
-      let yearsCount = selectedYearsCount;
+      const isRamadanKids = userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN';
+      let coverScene: Scene;
 
-      if (userInput.audience === TargetAudience.LOVERS) {
-        // Map internal types to strings expected by geminiService prompts
-        switch (loversStoryType) {
-          case '10_REASONS': effectiveTheme = '10 Reasons to Love You'; break;
-          case 'LOVE_STORY': effectiveTheme = 'Our Love Story'; break;
-          case 'BUCKET_LIST': effectiveTheme = 'Bucket List'; break;
-          case 'CUSTOM_STORY': effectiveTheme = `Custom Story: "${customStoryTitle}". Synopsis: ${customStorySynopsis}. The cover must visually represent this story concept.`; break;
-          default: effectiveTheme = '10 Reasons to Love You';
+      if (isRamadanKids) {
+        // Use the exact Ramadan front cover from the template so Quick Cover aligns with the story
+        const ramadanPlan = buildRamadanStoryPlan(userInput);
+        coverScene = ramadanPlan.scenes[0];
+      } else {
+        // Determine effective theme based on audience
+        let effectiveTheme = userInput.theme;
+        const yearsCount = selectedYearsCount;
+
+        if (userInput.audience === TargetAudience.LOVERS) {
+          switch (loversStoryType) {
+            case '10_REASONS': effectiveTheme = '10 Reasons to Love You'; break;
+            case 'LOVE_STORY': effectiveTheme = 'Our Love Story'; break;
+            case 'BUCKET_LIST': effectiveTheme = 'Bucket List'; break;
+            case 'CUSTOM_STORY': effectiveTheme = `Custom Story: "${customStoryTitle}". Synopsis: ${customStorySynopsis}. The cover must visually represent this story concept.`; break;
+            default: effectiveTheme = '10 Reasons to Love You';
+          }
         }
-      }
 
-      // Generate cover plan using the main story generation logic
-      const coverScene = await generateCoverPlan({
-        ...userInput,
-        theme: effectiveTheme,
-        style: quickCoverStyle,
-        yearsCount: yearsCount
-      }, quickCoverCustomInstructions);
+        coverScene = await generateCoverPlan({
+          ...userInput,
+          theme: effectiveTheme,
+          style: quickCoverStyle,
+          yearsCount: yearsCount
+        }, quickCoverCustomInstructions);
+      }
 
       // Generate Image using same logic as main story
       const img = await generateSceneImage(
