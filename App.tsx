@@ -3,9 +3,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Cropper from 'react-easy-crop';
 import { jsPDF } from 'jspdf';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset, KidsStoryTemplate } from './types';
-import { SCENE_COUNT_OPTIONS } from './constants';
 
 const LOGO_PATH = '/logo.png';
+/** App-only: allowed inner scene counts (default 15). */
+const SCENE_COUNT_OPTIONS = [10, 12, 15, 18];
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
 
 
