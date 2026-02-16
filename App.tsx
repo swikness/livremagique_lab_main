@@ -6,7 +6,7 @@ import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, Extra
 
 const LOGO_PATH = '/logo.png';
 /** App-only: allowed inner scene counts (default 15). */
-const SCENE_COUNT_OPTIONS = [10, 12, 15, 18];
+const SCENE_COUNT_OPTIONS = [10, 12, 15, 18, 30];
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
 
 
