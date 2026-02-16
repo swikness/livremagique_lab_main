@@ -365,6 +365,7 @@ const App: React.FC = () => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [selectedScenes, setSelectedScenes] = useState<Set<number>>(new Set());
   const [showPrompts, setShowPrompts] = useState<Record<number, boolean>>({});
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
@@ -476,6 +477,23 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[uiLanguage];
+
+  /** CSS font class for story text based on story type – distinctive but readable. */
+  const getStoryFontClass = (): string => {
+    const isKidsRamadan = userInput.theme?.includes('KIDS_RAMADAN') || userInput.theme?.includes('Ramadan');
+    if (userInput.audience === TargetAudience.KIDS || isKidsRamadan) return 'font-story-kids';
+    if (userInput.audience === TargetAudience.LOVERS && loversStoryType) {
+      switch (loversStoryType) {
+        case '10_REASONS': return 'font-story-romantic';
+        case 'LOVE_STORY': return 'font-story-classic';
+        case 'BUCKET_LIST': return 'font-story-adventure';
+        case 'CUSTOM_STORY': return 'font-story-modern';
+        default: break;
+      }
+    }
+    return 'font-story-literary';
+  };
+  const storyFontClass = getStoryFontClass();
 
   const innerCount = storyPlan != null && storyPlan.scenes.length >= 2 ? storyPlan.scenes.length - 2 : (userInput.sceneCount ?? 15);
   const backCoverIndex = innerCount + 1;
@@ -2506,6 +2524,26 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Synopsis Panel */}
+            {storyPlan.synopsis && (
+              <div className="mb-8 bg-slate-800/50 rounded-2xl border border-slate-700/50 overflow-hidden">
+                <button
+                  onClick={() => setSynopsisExpanded(!synopsisExpanded)}
+                  className="w-full p-4 flex justify-between items-center text-left hover:bg-slate-700/30 transition-colors"
+                >
+                  <span className="text-amber-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+                    <i className="fas fa-book-open"></i> {t.synopsisTitle}
+                  </span>
+                  <i className={`fas fa-chevron-${synopsisExpanded ? 'up' : 'down'} text-slate-400 text-xs`}></i>
+                </button>
+                {synopsisExpanded && (
+                  <div className={`px-4 pb-4 text-slate-300 text-sm leading-relaxed ${storyFontClass}`}>
+                    {storyPlan.synopsis}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Grid of Scenes */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
               {storyPlan.scenes.map((scene, idx) => (
@@ -2659,6 +2697,13 @@ const App: React.FC = () => {
                         }} className="bg-purple-600 text-white px-3 rounded-lg hover:bg-purple-500 transition-colors font-bold">
                           <i className="fas fa-magic"></i>
                         </button>
+                      </div>
+                    )}
+
+                    {/* Story Text (when scene has storyText) */}
+                    {scene.storyText && (
+                      <div className={`text-xs text-slate-300 leading-relaxed line-clamp-2 ${storyFontClass}`} title={scene.storyText}>
+                        {scene.storyText}
                       </div>
                     )}
 

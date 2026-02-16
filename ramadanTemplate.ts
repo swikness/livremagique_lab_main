@@ -96,10 +96,10 @@ const COVER_TITLE: Record<Lang, string> = {
 };
 
 /** Front cover image prompt: only the child, Ramadan feel via setting. */
-const COVER_PROMPT = `{STYLE_INSTRUCTION} COMPOSITION: A warm, welcoming scene for a children's book. The Main Character (a child) is the ONLY person in the frame, standing or sitting in a cozy interior or soft outdoor setting with subtle Ramadan atmosphere (e.g. soft lights, a calendar or moon motif in the background, warm colors). No other people. TEXT PLACEMENT: The title text must be placed on a CLEAN, UNCLUTTERED area. Leave natural negative space for the text. CHARACTERS: Only "The Main Character" (the child from the reference photo), facing the camera, in comfortable modest clothing. ${SINGLE_CHARACTER_RULE} LOGO PLACEMENT: Space at the bottom center for the logo. TYPOGRAPHY: BOLD, ELEGANT font contrasting with the background. HEADLINE TEXT: [TITLE_PLACEHOLDER]`;
+const COVER_PROMPT = `{STYLE_INSTRUCTION} COMPOSITION: A warm, welcoming scene for a children's book. The Main Character (a child) is the ONLY person in the frame, standing or sitting in a cozy interior or soft outdoor setting with subtle Ramadan atmosphere (e.g. soft lights, a calendar or moon motif in the background, warm colors). No other people. TEXT PLACEMENT: The title text must be placed on a CLEAN, UNCLUTTERED area. Leave natural negative space for the text. CHARACTERS: Only "The Main Character" (the child from the reference photo), facing the camera, in comfortable modest clothing. ${SINGLE_CHARACTER_RULE} LOGO PLACEMENT: Space at the bottom center for the logo. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. The text must contrast with the background. HEADLINE TEXT: [TITLE_PLACEHOLDER]`;
 
 /** Back cover image prompt: only the child waving/smiling. {{SYNOPSIS}} is replaced with the actual story synopsis. */
-const BACK_COVER_PROMPT_TEMPLATE = `Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Uncluttered background. Render this EXACT text at the top (use a clear, readable font): "{{SYNOPSIS}}" CENTER AREA: Only The Main Character (the child from the reference photo), front view, facing the camera, waving goodbye or smiling warmly. ${SINGLE_CHARACTER_RULE} BOTTOM AREA: Leave uncluttered or minimal space for a logo; do NOT add any other text or brand message.`;
+const BACK_COVER_PROMPT_TEMPLATE = `Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Uncluttered background. Render this EXACT text at the top. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. Text: "{{SYNOPSIS}}" CENTER AREA: Only The Main Character (the child from the reference photo), front view, facing the camera, waving goodbye or smiling warmly. ${SINGLE_CHARACTER_RULE} BOTTOM AREA: Leave uncluttered or minimal space for a logo; do NOT add any other text or brand message.`;
 
 /** Inner scene prompt template: side-by-side layout, only the child, then TEXT: {{STORY_TEXT}} */
 function scenePromptTemplate(sceneDescription: string, characterSide: 'LEFT' | 'RIGHT'): string {
@@ -113,7 +113,7 @@ CHARACTER SAFETY: Use a WIDE SHOT (Medium-Long Shot). Leave margin around the ch
 ${sceneDescription}
 ${SINGLE_CHARACTER_RULE}
 LAYOUT: Seamless continuous background across the entire width.
-TEXT PLACEMENT: Place the text in the uncluttered area, away from the spine and edges. Use a SIMPLE, CLEAN, STANDARD FONT (Serif or Sans-Serif), highly readable. Do NOT use cursive or fancy fonts.
+TEXT PLACEMENT: Place the text in the uncluttered area, away from the spine and edges. TYPOGRAPHY: Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. Do NOT use cursive or fancy fonts.
 TEXT: {{STORY_TEXT}}`;
 }
 

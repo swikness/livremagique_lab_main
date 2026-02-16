@@ -39,6 +39,31 @@ const STYLE_DESCRIPTIONS = {
   [StoryStyle.VECTOR_ART]: "modern commercial vector illustration, 2D flat design with soft gradient shading, cute avatar style, big head small body proportions, vibrant saturated colors, clean sharp edges, smooth vector gradients, romantic cartoon, playful and expressive, highly polished digital art. CHARACTER CONSISTENCY: Maintain exact facial features and hair style from the reference photos in a vector style."
 };
 
+/** Typography instructions per story type – distinctive but readable. */
+function getTypographyForStoryType(input: UserInput): string {
+  const isKidsRamadan = input.theme.includes('KIDS_RAMADAN') || input.theme.includes('Ramadan');
+  if (input.audience === TargetAudience.KIDS || isKidsRamadan) {
+    return "Soft rounded sans-serif – warm, friendly, child-appropriate and highly readable. Do NOT use cursive or decorative fonts.";
+  }
+  const loversType = input.loversStoryType;
+  if (input.audience === TargetAudience.LOVERS && loversType) {
+    switch (loversType) {
+      case '10_REASONS':
+        return "Warm elegant serif with gentle curves – romantic yet highly readable. Do NOT use cursive or overly decorative fonts.";
+      case 'LOVE_STORY':
+        return "Timeless classic serif – refined, emotional, and perfectly legible. Do NOT use cursive or fancy decorative fonts.";
+      case 'BUCKET_LIST':
+        return "Bold modern display font – adventurous and energetic but clear and legible. Do NOT use cursive or illegible script.";
+      case 'CUSTOM_STORY':
+        return "Sophisticated modern type – clean, distinctive, and highly readable. Do NOT use cursive or decorative fonts.";
+      default:
+        break;
+    }
+  }
+  // Adults (themed) or fallback
+  return "Clean literary serif – storybook feel, warm and readable. Do NOT use cursive, handwriting, or fancy decorative fonts.";
+}
+
 export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> => {
   const genAI = getFreshAI();
   // UPGRADE: Using gemini-3-pro for superior reasoning
@@ -97,6 +122,8 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     ? `\n    KIDS RAMADAN RULE: The story MUST follow a single, fixed Ramadan story structure (preparing for the month, first iftar, family moments, giving, celebration). Only the main character's name (${input.name}) and the correct pronoun (he/she in ${input.language}) may change. Do NOT personalize plot or events—same story for every child.`
     : '';
 
+  const typographyInstruction = getTypographyForStoryType(input);
+
   const prompt = `
     You are a professional book editor and world-class storyteller. 
     Create a detailed ${totalScenes}-part story plan for a ${input.audience} book.
@@ -137,7 +164,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".${customTitleLine}
     - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title (except when a custom title is provided or Kids Ramadan).
     - Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: ${typographyInstruction} The text must contrast strongly with the background and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     RULES FOR INDEX 1-${N} (STORY SCENES):
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
@@ -154,7 +181,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       [Further scene details].
       LAYOUT: Maintain a seamless continuous background across the entire width. 
       TEXT PLACEMENT: Place the text strictly in the 'Uncluttered Background' area. CRITICAL: The text block must be away from the EXACT VERTICAL CENTER (spine) and the outer edges to avoid cut-off. Center the text block vertically within the available space.
-      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a SIMPLE, CLEAN, STANDARD FONT (like Serif or Sans-Serif) that is highly readable. Do NOT use cursive, handwriting, or fancy decorative fonts. The font style must be consistent across all scenes.
+      TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. ${typographyInstruction} The font style must be consistent across all scenes.
       TEXT: [STORY_TEXT]"
 
     RULES FOR INDEX ${backCoverIndex} (BACK COVER):
@@ -244,6 +271,7 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
   const isKidsRamadanCover = input.theme.includes('KIDS_RAMADAN') || input.theme.includes('Ramadan');
   const ramadanTitleCover = input.language === 'French' ? `Mon Ramadan avec ${input.name}` : `My Ramadan with ${input.name}`;
   const ramadanCoverRule = isKidsRamadanCover ? `0. IF Theme contains 'KIDS_RAMADAN' or 'Ramadan': Title MUST be exactly "${ramadanTitleCover}" (child's name: ${input.name}).` : '';
+  const typographyInstruction = getTypographyForStoryType(input);
 
   const prompt = `
     You are a professional book cover designer.
@@ -270,7 +298,7 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
     - Be creative with the setting, lighting, and atmosphere to match the story mood.
     
     Generate a prompt using this template:
-      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition that VISUALLY REPRESENTS the story concept]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
+      "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition that VISUALLY REPRESENTS the story concept]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: ${typographyInstruction} The text must contrast strongly with the background and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
     Return JSON format: { "title": "...", "prompt": "..." }
   `;
