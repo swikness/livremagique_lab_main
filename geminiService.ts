@@ -97,7 +97,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     }
   });
 
-  const N = Math.min(20, Math.max(8, input.sceneCount ?? 15));
+  const N = Math.min(30, Math.max(8, input.sceneCount ?? 15));
   const totalScenes = N + 2;
   const backCoverIndex = N + 1;
 
