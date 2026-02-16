@@ -8,6 +8,7 @@ const LOGO_PATH = '/logo.png';
 /** App-only: allowed inner scene counts (default 15). */
 const SCENE_COUNT_OPTIONS = [10, 12, 15, 18, 30];
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
+import { buildRamadanStoryPlan, RAMADAN_INNER_SCENES } from './ramadanTemplate';
 
 
 const THEME_OPTIONS = [
@@ -106,6 +107,7 @@ const TRANSLATIONS = {
     storyTemplate: "Modèle d'histoire",
     ramadanTitle: (name: string, _gender: string) => `Mon Ramadan avec ${name || '[Nom]'}`,
     numberOfScenes: "Nombre de scènes",
+    ramadanPagesNote: "6 scènes (histoire fixe)",
     customStory: "Histoire personnalisée",
   },
   English: {
@@ -178,6 +180,7 @@ const TRANSLATIONS = {
     storyTemplate: "Story Template",
     ramadanTitle: (name: string, _gender: string) => `My Ramadan with ${name || '[Name]'}`,
     numberOfScenes: "Number of scenes",
+    ramadanPagesNote: "6 story pages (fixed story)",
     customStory: "Custom story",
   }
 };
@@ -885,7 +888,10 @@ const App: React.FC = () => {
         kidsStoryTemplate: userInput.audience === TargetAudience.KIDS ? kidsStoryTemplate ?? undefined : undefined,
         sceneCount: userInput.sceneCount ?? 15
       };
-      const plan = await generateStoryPlan(payload);
+      const plan =
+        userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN'
+          ? buildRamadanStoryPlan(payload)
+          : await generateStoryPlan(payload);
       setStoryPlan(plan);
       setStep(AppStep.CREATION);
     } catch (error: any) {
@@ -2255,15 +2261,21 @@ const App: React.FC = () => {
                   {!sheetContext && (
                     <div className="space-y-1 col-span-2">
                       <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.numberOfScenes}</label>
-                      <select
-                        value={userInput.sceneCount ?? 15}
-                        onChange={(e) => setUserInput(prev => ({ ...prev, sceneCount: Number(e.target.value) }))}
-                        className="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700 focus:border-amber-400 outline-none text-xs font-bold"
-                      >
-                        {SCENE_COUNT_OPTIONS.map(n => (
-                          <option key={n} value={n} className="bg-slate-900">{n}</option>
-                        ))}
-                      </select>
+                      {userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN' ? (
+                        <p className="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700 text-slate-400 text-xs font-bold">
+                          {t.ramadanPagesNote}
+                        </p>
+                      ) : (
+                        <select
+                          value={userInput.sceneCount ?? 15}
+                          onChange={(e) => setUserInput(prev => ({ ...prev, sceneCount: Number(e.target.value) }))}
+                          className="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700 focus:border-amber-400 outline-none text-xs font-bold"
+                        >
+                          {SCENE_COUNT_OPTIONS.map(n => (
+                            <option key={n} value={n} className="bg-slate-900">{n}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
                 </div>
