@@ -80,4 +80,10 @@ export interface UserInput {
   customNote?: string;
   /** From sheet: book type for UI (Livre 1–4); inferred from bookName */
   loversStoryType?: '10_REASONS' | 'LOVE_STORY' | 'BUCKET_LIST' | 'CUSTOM_STORY';
+  /** Kids template: fixed story, only kid name and pronoun vary (app-only) */
+  kidsStoryTemplate?: KidsStoryTemplate | null;
+  /** Number of inner story scenes (app-only, default 15). Total plan = sceneCount + 2 (front + back). */
+  sceneCount?: number;
 }
+
+export type KidsStoryTemplate = 'RAMADAN';

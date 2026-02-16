@@ -72,6 +72,10 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     }
   });
 
+  const N = Math.min(20, Math.max(8, input.sceneCount ?? 15));
+  const totalScenes = N + 2;
+  const backCoverIndex = N + 1;
+
   const themesStr = input.selectedThemes.join(', ');
   const char1Info = `${input.name} (Age: ${input.age}, Gender: ${input.gender})`;
   const char2Info = input.audience === TargetAudience.LOVERS ? ` and ${input.partnerName} (Age: ${input.partnerAge}, Gender: ${input.partnerGender})` : '';
@@ -82,9 +86,20 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
   const yearsForTitle = input.yearsCount || '2';
   const customTitleLine = input.customTitle ? `\n      4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Title MUST be exactly "${input.customTitle}".` : '';
 
+  const isKidsRamadan = input.theme.includes('KIDS_RAMADAN') || input.theme.includes('Ramadan');
+  const ramadanTitleFr = `Mon Ramadan avec ${input.name}`;
+  const ramadanTitleEn = `My Ramadan with ${input.name}`;
+  const ramadanTitleRule = isKidsRamadan
+    ? `\n      0. IF Theme contains 'KIDS_RAMADAN' or 'Ramadan': Title MUST be exactly "${input.language === 'French' ? ramadanTitleFr : ramadanTitleEn}" (or the equivalent in ${input.language}). Use the child's name "${input.name}" and keep the same title format.`
+    : '';
+
+  const ramadanStoryRule = isKidsRamadan
+    ? `\n    KIDS RAMADAN RULE: The story MUST follow a single, fixed Ramadan story structure (preparing for the month, first iftar, family moments, giving, celebration). Only the main character's name (${input.name}) and the correct pronoun (he/she in ${input.language}) may change. Do NOT personalize plot or events—same story for every child.`
+    : '';
+
   const prompt = `
     You are a professional book editor and world-class storyteller. 
-    Create a detailed 17-part story plan for a ${input.audience} book.
+    Create a detailed ${totalScenes}-part story plan for a ${input.audience} book.
     ${mainCharacterContext}
     Story Concept: ${input.theme}
     Themes to include: ${themesStr}
@@ -92,6 +107,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     Target Language for ALL TEXT: ${input.language}
     Target Language for ALL TEXT: ${input.language}
     STORY TEXT RULE: Each scene text MUST be exactly or very close to ${input.wordsPerScene} words in ${input.language}.
+    ${ramadanStoryRule}
     
     CULTURAL CONTEXT: The story setting should reflect the visual style of the reference photos provided. Do not enforce any specific country unless obvious from the reference. Mix contemporary lifestyles with traditional touches if appropriate to the style. Keep the tone respectful and family-friendly.
     
@@ -108,22 +124,22 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
     
     Return a JSON structure containing:
     1. A synopsis of the story (in ${input.language}).
-    2. An array of 17 components:
+    2. An array of exactly ${totalScenes} components:
        - Index 0: Front Cover
-       - Index 1 to 15: Story scenes (wide cinematic shots)
-       - Index 16: Back Cover
+       - Index 1 to ${N}: Story scenes (wide cinematic shots)
+       - Index ${backCoverIndex}: Back Cover
 
     RULES FOR INDEX 0 (FRONT COVER):
     - Title must reflect the relationship if it's a couple.
-    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:
+    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type:${ramadanTitleRule}
       1. IF Theme is '10 Reasons to Love You' or 'Raisons d'Aimer': Title MUST be exactly "RAISONS POUR LESQUELLES JE T'AIME ${raisonsRecipientName}" (recipient's name). Do NOT add any number (no "10", no digit) before "RAISONS"—the title must start with the word RAISONS only.
       2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${yearsForTitle} ANS D'AMOUR DEJA" (use the years value provided, e.g. ${yearsForTitle}). Do NOT use a fixed number.
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".${customTitleLine}
-    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title (except when a custom title is provided).
+    - The names "${input.name}" and "${input.partnerName}" are MANDATORY in the title (except when a custom title is provided or Kids Ramadan).
     - Generate a prompt using this template:
       "{STYLE_INSTRUCTION} COMPOSITION: [Describe a dynamic, central composition]. TEXT PLACEMENT & READABILITY: The title text must be placed on a CLEAN, UNCLUTTERED area of the background. This area must be free of complex details, characters, or heavy patterns to ensure the text is perfectly legible. COMPOSITION: Arrange the scene intelligently so that there is natural negative space available for the text without forcing artificial gaps. CHARACTERS: [Describe "The Main Character" ${input.audience === TargetAudience.LOVERS ? 'and "The Partner"' : ''} in specific NEW outfits related to the story concept. THEY MUST BE FACING THE CAMERA.]. [Describe allies/extras]. LOGO PLACEMENT: The logo will be placed at the bottom center, ensure this area is suitable. TYPOGRAPHY: Use a BOLD, ELEGANT font that contrasts strongly with the background. The text must pop and be easily readable. HEADLINE TEXT: [Generated Title in ${input.language}]"
 
-    RULES FOR INDEX 1-15 (STORY SCENES):
+    RULES FOR INDEX 1-${N} (STORY SCENES):
     - Generate 'storyText': Exactly or close to ${input.wordsPerScene} words in ${input.language}.
     - Generate a 'prompt' using this EXACT TEMPLATE:
       "you are a professional digital illustrator. STYLE: {STYLE_INSTRUCTION}. 
@@ -141,7 +157,7 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
       TYPOGRAPHY: You MUST incorporate the [STORY_TEXT] into the image. Use a SIMPLE, CLEAN, STANDARD FONT (like Serif or Sans-Serif) that is highly readable. Do NOT use cursive, handwriting, or fancy decorative fonts. The font style must be consistent across all scenes.
       TEXT: [STORY_TEXT]"
 
-    RULES FOR INDEX 16 (BACK COVER):
+    RULES FOR INDEX ${backCoverIndex} (BACK COVER):
     - Summary of the book (in ${input.language}).
     - Title of the book mentioned.
     - PROMPT INSTRUCTION:
@@ -169,15 +185,17 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 
   const raw = JSON.parse(responseText || '{}');
   console.log("Plan Generated Successfully.");
+  const scenes = Array.isArray(raw.scenes) ? raw.scenes.slice(0, totalScenes) : [];
   return {
-    synopsis: raw.synopsis,
-    scenes: raw.scenes.map((s: any, idx: number) => ({
+    synopsis: raw.synopsis || '',
+    scenes: scenes.map((s: any, idx: number) => ({
       ...s,
+      id: s.id ?? idx,
+      type: idx === 0 ? 'front-cover' : idx === backCoverIndex ? 'back-cover' : 'scene',
       history: [],
       status: 'idle',
-      // UPGRADE: 16:9 for scenes, 1:1 for covers
-      aspectRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9',
-      generationRatio: (idx === 0 || idx === 16) ? '1:1' : '16:9'
+      aspectRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9',
+      generationRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9'
     }))
   };
 };
@@ -213,6 +231,10 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
     ? `4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Title MUST be exactly "${input.customTitle}". Use this as the headline text. The visual composition MUST directly represent the synopsis provided.`
     : `4. IF Theme contains 'Custom Story' or 'CUSTOM_STORY': Extract the Book Title from the theme and use it as the cover title. The visual composition MUST directly represent the synopsis provided - include specific visual elements, settings, and atmosphere that tell the story just from looking at the cover.`;
 
+  const isKidsRamadanCover = input.theme.includes('KIDS_RAMADAN') || input.theme.includes('Ramadan');
+  const ramadanTitleCover = input.language === 'French' ? `Mon Ramadan avec ${input.name}` : `My Ramadan with ${input.name}`;
+  const ramadanCoverRule = isKidsRamadanCover ? `0. IF Theme contains 'KIDS_RAMADAN' or 'Ramadan': Title MUST be exactly "${ramadanTitleCover}" (child's name: ${input.name}).` : '';
+
   const prompt = `
     You are a professional book cover designer.
     Generate a Front Cover plan for a ${input.audience} book.
@@ -224,7 +246,7 @@ export const generateCoverPlan = async (input: UserInput, customInstructions?: s
 
     RULES FOR FRONT COVER:
     - Title must reflect the relationship if it's a couple.
-    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type (if known, otherwise invent a magical title):
+    - MANDATORY: The title text on the cover MUST follow these EXACT formats based on the story type (if known, otherwise invent a magical title):${ramadanCoverRule ? '\n      ' + ramadanCoverRule : ''}
       1. IF Theme is '10 Reasons to Love You' or 'Raisons d'Aimer': Title MUST be exactly "RAISONS POUR LESQUELLES JE T'AIME ${raisonsRecipientName}" (recipient's name). Do NOT add any number (no "10", no digit) before "RAISONS"—the title must start with the word RAISONS only.
       2. IF Theme is 'Our Love Story': Title MUST be "${input.name} & ${input.partnerName} : ${yearsForTitle} ANS D'AMOUR DEJA" (use ${yearsForTitle} years from the sheet). Do NOT use a fixed number—use the years value provided.
       3. IF Theme is 'Bucket List': Title MUST be "${input.name} & ${input.partnerName} : NOTRE LISTE DE RÊVES".

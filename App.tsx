@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Cropper from 'react-easy-crop';
 import { jsPDF } from 'jspdf';
-import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset } from './types';
+import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset, KidsStoryTemplate } from './types';
+import { SCENE_COUNT_OPTIONS } from './constants';
 
 const LOGO_PATH = '/logo.png';
 import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
@@ -101,6 +102,10 @@ const TRANSLATIONS = {
     sendConfirm: "Confirmer et envoyer",
     coverSentToDrive: "Couverture envoyée vers Drive. La sheet a été mise à jour (colonne V).",
     dataLoadedFromSheetCover: "Générez la couverture ci-dessous puis cliquez sur Confirmer et envoyer pour enregistrer le lien en colonne V.",
+    storyTemplate: "Modèle d'histoire",
+    ramadanTitle: (name: string, _gender: string) => `Mon Ramadan avec ${name || '[Nom]'}`,
+    numberOfScenes: "Nombre de scènes",
+    customStory: "Histoire personnalisée",
   },
   English: {
     appTitle: "Magical Book Lab",
@@ -169,6 +174,10 @@ const TRANSLATIONS = {
     sendConfirm: "Send confirm",
     coverSentToDrive: "Cover sent to Drive. Sheet updated (column V).",
     dataLoadedFromSheetCover: "Generate the cover below then click Send confirm to save the link in column V.",
+    storyTemplate: "Story Template",
+    ramadanTitle: (name: string, _gender: string) => `My Ramadan with ${name || '[Name]'}`,
+    numberOfScenes: "Number of scenes",
+    customStory: "Custom story",
   }
 };
 
@@ -323,9 +332,11 @@ const App: React.FC = () => {
     style: StoryStyle.ANIMATION_3D,
     extras: [],
     language: 'French',
-    wordsPerScene: 15
+    wordsPerScene: 15,
+    sceneCount: 15
   });
   const [loversStoryType, setLoversStoryType] = useState<LoversStoryType>(null);
+  const [kidsStoryTemplate, setKidsStoryTemplate] = useState<KidsStoryTemplate | null>(null);
   const [loversOptionsExpanded, setLoversOptionsExpanded] = useState(false);
   const [recipientType, setRecipientType] = useState<RecipientType>('HER');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -421,10 +432,11 @@ const App: React.FC = () => {
   const stopGenerationRef = useRef(false);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
 
-  // Quick Cover State
+  // Quick Cover State: single list of all designs this session + selected index (no duplication)
   const [quickCoverVisible, setQuickCoverVisible] = useState(false);
   const [quickCoverScene, setQuickCoverScene] = useState<Scene | null>(null);
-  const [quickCoverHistory, setQuickCoverHistory] = useState<{ imageUrl: string; title?: string }[]>([]);
+  const [quickCoverDesigns, setQuickCoverDesigns] = useState<{ imageUrl: string; title?: string }[]>([]);
+  const [selectedCoverIndex, setSelectedCoverIndex] = useState<number>(-1);
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
   const [quickCoverCustomInstructions, setQuickCoverCustomInstructions] = useState<string>('');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
@@ -460,6 +472,9 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[uiLanguage];
+
+  const innerCount = storyPlan != null && storyPlan.scenes.length >= 2 ? storyPlan.scenes.length - 2 : (userInput.sceneCount ?? 15);
+  const backCoverIndex = innerCount + 1;
 
   useEffect(() => {
     if (errorMessage) {
@@ -850,6 +865,8 @@ const App: React.FC = () => {
         const context = loversStoryType === 'LOVE_STORY' ? ` Specifically covering ${selectedYearsCount} years of love.` : '';
         finalTheme = `Story Type: ${loversStoryType}.${context} Recipient: ${recipientType}. Key milestones chosen by user: ${selectedOptions.join(' | ')}`;
       }
+    } else if (userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN') {
+      finalTheme = "Story Type: KIDS_RAMADAN. A heartwarming Ramadan story for a child. Same story structure for every child; only the child's name and gender (he/she) are personalized. The story follows a fixed Ramadan journey: preparing for the month, first iftar, family moments, giving, and celebration. Use the main character's name and correct pronoun throughout the storyText.";
     } else {
       if (!userInput.theme.trim()) missing.push(t.storyBlueprint);
     }
@@ -861,7 +878,13 @@ const App: React.FC = () => {
 
     setLoading(true);
     try {
-      const plan = await generateStoryPlan({ ...userInput, theme: finalTheme });
+      const payload: UserInput = {
+        ...userInput,
+        theme: finalTheme,
+        kidsStoryTemplate: userInput.audience === TargetAudience.KIDS ? kidsStoryTemplate ?? undefined : undefined,
+        sceneCount: userInput.sceneCount ?? 15
+      };
+      const plan = await generateStoryPlan(payload);
       setStoryPlan(plan);
       setStep(AppStep.CREATION);
     } catch (error: any) {
@@ -885,12 +908,13 @@ const App: React.FC = () => {
       setStep(AppStep.CREATION);
       setLoading(false);
 
-      // Generate scenes 1-16 (skip 0, cover from sheet)
+      // Generate scenes 1 to last (skip 0, cover from sheet)
       setIsGeneratingScenes(true);
       const newScenes = [...plan.scenes];
-      for (let i = 1; i <= 16; i++) {
+      const lastSceneIndex = plan.scenes.length - 1;
+      for (let i = 1; i <= lastSceneIndex; i++) {
         const scene = newScenes[i];
-        const isCover = i === 16;
+        const isCover = i === lastSceneIndex;
         try {
           scene.status = 'loading';
           setStoryPlan({ ...plan, scenes: [...newScenes] });
@@ -973,12 +997,9 @@ const App: React.FC = () => {
         logoBase64 // Include logo for consistency with main story
       );
 
-      setQuickCoverHistory(prev => {
-        if (quickCoverScene?.imageUrl) {
-          return [...prev, { imageUrl: quickCoverScene.imageUrl, title: quickCoverScene.title }];
-        }
-        return prev;
-      });
+      const newDesign = { imageUrl: img, title: coverScene.title };
+      setQuickCoverDesigns(prev => [...prev, newDesign]);
+      setSelectedCoverIndex(prev => prev + 1);
       setQuickCoverScene({ ...coverScene, imageUrl: img, status: 'done' });
     } catch (e: any) {
       console.error(e);
@@ -1036,7 +1057,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerateScenes = () => {
-    const indices = Array.from({ length: 15 }, (_, i) => i + 1);
+    const indices = Array.from({ length: innerCount }, (_, i) => i + 1);
     handleProcessSceneQueue(indices);
   };
 
@@ -1056,9 +1077,8 @@ const App: React.FC = () => {
     const newScenes = [...storyPlan.scenes];
     let changed = false;
 
-    // We only Auto-Split scenes 1-15 (The inner pages). 
-    // Covers (0 & 16) are 1:1 and don't need splitting.
-    for (let i = 1; i <= 15; i++) {
+    // We only Auto-Split inner scenes (1 to innerCount). Covers (0 & backCoverIndex) are 1:1.
+    for (let i = 1; i <= innerCount; i++) {
       const scene = newScenes[i];
 
       // Only process if we have an image and it's not already split
@@ -1179,8 +1199,8 @@ const App: React.FC = () => {
       scene.imageUrl = newImage;
       addToHistory(scene, newImage);
 
-      // If it's a scene (1-15), we need to re-split it
-      if (index >= 1 && index <= 15) {
+      // If it's an inner scene (1 to innerCount), we need to re-split it
+      if (index >= 1 && index <= innerCount) {
         const croppedPanoromic = await autoCropToRatio(newImage, 2);
         const [left, right] = await splitImage(croppedPanoromic);
         scene.splitImages = [left, right];
@@ -1202,8 +1222,8 @@ const App: React.FC = () => {
     setUltimateProgress(1);
 
     try {
-      // 1. Generate All Images (0 - 16) = 17 steps
-      // 2. Auto Split Scenes (1 - 15) = 15 steps
+      // 1. Generate All Images (0 to backCoverIndex)
+      // 2. Auto Split Scenes (1 to innerCount)
       // Total operations = 32 roughly
 
       const totalOps = 32;
@@ -1225,7 +1245,7 @@ const App: React.FC = () => {
         const batch = [i, i + 1, i + 2].filter(idx => idx < newScenes.length);
         await Promise.all(batch.map(async (idx) => {
           const scene = newScenes[idx];
-          const isCover = idx === 0 || idx === 16;
+          const isCover = idx === 0 || idx === backCoverIndex;
           try {
             const rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
             newScenes[idx].imageUrl = rawImage;
@@ -1243,8 +1263,8 @@ const App: React.FC = () => {
         setStoryPlan({ ...storyPlan, scenes: [...newScenes] }); // Update UI periodically
       }
 
-      // Step 2: Auto Split Scenes (1-15)
-      for (let i = 1; i <= 15; i++) {
+      // Step 2: Auto Split Scenes (1 to innerCount)
+      for (let i = 1; i <= innerCount; i++) {
         const scene = newScenes[i];
         if (scene.imageUrl && scene.status === 'done') {
           try {
@@ -1265,7 +1285,7 @@ const App: React.FC = () => {
 
       // Step 3: Auto-Review & Fix (All scenes 0-16)
       // We do this serially to avoid overwhelming and better logging
-      for (let i = 0; i <= 16; i++) {
+      for (let i = 0; i <= backCoverIndex; i++) {
         await verifyAndFixScene(i);
         updateProg(); // We can add "Verification" to progress total or just reuse slot
       }
@@ -1289,7 +1309,7 @@ const App: React.FC = () => {
   };
 
   const buildSquarePdfForDrive = async (): Promise<Blob> => {
-    if (!storyPlan || storyPlan.scenes.length < 17) throw new Error('Plan must have 17 scenes');
+    if (!storyPlan || storyPlan.scenes.length < innerCount + 2) throw new Error(`Plan must have ${innerCount + 2} scenes`);
     const PAGE = 576;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE, PAGE] });
     const isRTL = userInput.language === 'Arabic';
@@ -1305,7 +1325,7 @@ const App: React.FC = () => {
       doc.addImage(dataUrlToBase64(square), 'JPEG', 0, 0, PAGE, PAGE);
     }
 
-    for (let i = 1; i <= 15; i++) {
+    for (let i = 1; i <= innerCount; i++) {
       const scene = storyPlan.scenes[i];
       let leftImg: string | null = null;
       let rightImg: string | null = null;
@@ -1333,7 +1353,7 @@ const App: React.FC = () => {
     }
 
     doc.addPage([PAGE, PAGE]);
-    const backCover = storyPlan.scenes[16].imageUrl;
+    const backCover = storyPlan.scenes[backCoverIndex].imageUrl;
     if (backCover) {
       const square = await ensureSquareDataUrl(backCover);
       doc.addImage(dataUrlToBase64(square), 'JPEG', 0, 0, PAGE, PAGE);
@@ -1345,13 +1365,13 @@ const App: React.FC = () => {
   const handleSendToDrive = async () => {
     if (!sheetContext || !storyPlan) return;
     const unsplit = [];
-    for (let i = 1; i <= 15; i++) {
+    for (let i = 1; i <= innerCount; i++) {
       if (!storyPlan.scenes[i].splitImages) unsplit.push(i);
     }
     if (unsplit.length > 0) {
       setErrorMessage(uiLanguage === 'French'
-        ? "Divisez toutes les scènes (1-15) avant d'envoyer vers Drive."
-        : "Split all scenes (1-15) before sending to Drive.");
+        ? `Divisez toutes les scènes (1-${innerCount}) avant d'envoyer vers Drive.`
+        : `Split all scenes (1-${innerCount}) before sending to Drive.`);
       return;
     }
     setLoading(true);
@@ -1628,13 +1648,13 @@ const App: React.FC = () => {
     const isRTL = userInput.language === 'Arabic';
     setLoading(true);
     try {
-      // VALIDATION: Check for Front (0), Back (16) and Scenes 1-15
+      // VALIDATION: Check for Front (0), Back (backCoverIndex) and Scenes 1 to innerCount
       const missingScenes = [];
       if (!storyPlan.scenes[0].imageUrl) missingScenes.push("Front Cover");
-      for (let i = 1; i <= 15; i++) {
+      for (let i = 1; i <= innerCount; i++) {
         if (!storyPlan.scenes[i].imageUrl) missingScenes.push(`Scene ${i}`);
       }
-      if (!storyPlan.scenes[16].imageUrl) missingScenes.push("Back Cover");
+      if (!storyPlan.scenes[backCoverIndex].imageUrl) missingScenes.push("Back Cover");
 
       if (missingScenes.length > 0) {
         setErrorMessage(uiLanguage === 'French'
@@ -1646,15 +1666,15 @@ const App: React.FC = () => {
 
       if (format === 'PAGES') {
         // ===== 32-PAGE FORMAT: Individual pages =====
-        // Validate that all scenes 1-15 have been split
+        // Validate that all inner scenes have been split
         const unsplitScenes = [];
-        for (let i = 1; i <= 15; i++) {
+        for (let i = 1; i <= innerCount; i++) {
           if (!storyPlan.scenes[i].splitImages) unsplitScenes.push(`Scene ${i}`);
         }
         if (unsplitScenes.length > 0) {
           setErrorMessage(uiLanguage === 'French'
-            ? "Impossible de générer le PDF 32 pages : certaines scènes n'ont pas été divisées. Veuillez diviser toutes les scènes d'abord."
-            : "Cannot generate 32-page PDF: some scenes have not been split. Please split all scenes first.");
+            ? "Impossible de générer le PDF : certaines scènes n'ont pas été divisées. Veuillez diviser toutes les scènes d'abord."
+            : "Cannot generate PDF: some scenes have not been split. Please split all scenes first.");
           setLoading(false);
           return;
         }
@@ -1675,8 +1695,8 @@ const App: React.FC = () => {
         const coverY = (pageH - coverSize) / 2;
         doc.addImage(frontCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
 
-        // Pages 2-31: Scene split images (2 pages per scene × 15 scenes = 30 pages)
-        for (let i = 1; i <= 15; i++) {
+        // Pages 2 to 2+2*innerCount: Scene split images (2 pages per inner scene)
+        for (let i = 1; i <= innerCount; i++) {
           const scene = storyPlan.scenes[i];
           const [leftImg, rightImg] = scene.splitImages!;
 
@@ -1695,9 +1715,9 @@ const App: React.FC = () => {
           }
         }
 
-        // Page 32: Back Cover (scene 16) - 1:1 image centered on portrait page
+        // Last page: Back Cover - 1:1 image centered on portrait page
         doc.addPage([pageW, pageH]);
-        const backCoverImg = storyPlan.scenes[16].imageUrl!;
+        const backCoverImg = storyPlan.scenes[backCoverIndex].imageUrl!;
         doc.addImage(backCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
 
         doc.save(`${userInput.name}-Magical-Book-32Pages.pdf`);
@@ -1717,7 +1737,7 @@ const App: React.FC = () => {
         const ctx = coverCanvas.getContext('2d');
         if (ctx) {
           const frontImg = await createImage(storyPlan.scenes[0].imageUrl!);
-          const backImg = await createImage(storyPlan.scenes[16].imageUrl!);
+          const backImg = await createImage(storyPlan.scenes[backCoverIndex].imageUrl!);
 
           if (isRTL) {
             ctx.drawImage(frontImg, 0, 0, 1024, 1024);
@@ -1730,8 +1750,8 @@ const App: React.FC = () => {
         const spreadData = coverCanvas.toDataURL('image/jpeg', 0.95);
         doc.addImage(spreadData, 'JPEG', 0, 32, 1024, 512);
 
-        // PAGES 2-16: SCENES 1-15 (16:9)
-        for (let i = 1; i <= 15; i++) {
+        // PAGES 2 to innerCount+1: SCENES 1 to innerCount (16:9)
+        for (let i = 1; i <= innerCount; i++) {
           doc.addPage([1024, 576]);
           const scene = storyPlan.scenes[i];
           if (scene.imageUrl) {
@@ -2159,24 +2179,49 @@ const App: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      <textarea
-                        name="theme"
-                        value={userInput.theme}
-                        onChange={handleInputChange}
-                        className="w-full h-24 bg-slate-800/50 p-4 rounded-xl border border-slate-700 focus:border-amber-400 outline-none"
-                        placeholder={t.placeholderTheme}
-                      />
-                      <div className="flex flex-wrap gap-2 pt-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        {THEME_OPTIONS.map(theme => (
-                          <button
-                            key={theme}
-                            onClick={() => toggleThemeTag(theme)}
-                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${userInput.selectedThemes.includes(theme) ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500 hover:border-slate-500'}`}
-                          >
-                            {theme}
-                          </button>
-                        ))}
-                      </div>
+                      {userInput.audience === TargetAudience.KIDS && (
+                        <div className="space-y-2 mb-4">
+                          <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.storyTemplate}</label>
+                          <div className="grid grid-cols-1 gap-2">
+                            <button
+                              onClick={() => setKidsStoryTemplate('RAMADAN')}
+                              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${kidsStoryTemplate === 'RAMADAN' ? 'border-amber-400 bg-amber-400/10 text-amber-400' : 'border-slate-700 text-slate-500'}`}
+                            >
+                              <i className="fas fa-moon"></i>
+                              <span className="text-[10px] font-bold uppercase tracking-tight italic">{t.ramadanTitle(userInput.name, userInput.gender)}</span>
+                            </button>
+                            <button
+                              onClick={() => setKidsStoryTemplate(null)}
+                              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${kidsStoryTemplate === null ? 'border-amber-400 bg-amber-400/10 text-amber-400' : 'border-slate-700 text-slate-500'}`}
+                            >
+                              <i className="fas fa-feather-alt"></i>
+                              <span className="text-[10px] font-bold uppercase tracking-tight">{t.customStory}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {(userInput.audience !== TargetAudience.KIDS || kidsStoryTemplate === null) && (
+                        <>
+                          <textarea
+                            name="theme"
+                            value={userInput.theme}
+                            onChange={handleInputChange}
+                            className="w-full h-24 bg-slate-800/50 p-4 rounded-xl border border-slate-700 focus:border-amber-400 outline-none"
+                            placeholder={t.placeholderTheme}
+                          />
+                          <div className="flex flex-wrap gap-2 pt-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                            {THEME_OPTIONS.map(theme => (
+                              <button
+                                key={theme}
+                                onClick={() => toggleThemeTag(theme)}
+                                className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${userInput.selectedThemes.includes(theme) ? 'bg-amber-400 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-500 hover:border-slate-500'}`}
+                              >
+                                {theme}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -2206,6 +2251,20 @@ const App: React.FC = () => {
                     <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.wordsPerPage}</label>
                     <input name="wordsPerScene" type="number" value={userInput.wordsPerScene} onChange={handleInputChange} className="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700 focus:border-amber-400 outline-none text-xs font-bold" />
                   </div>
+                  {!sheetContext && (
+                    <div className="space-y-1 col-span-2">
+                      <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.numberOfScenes}</label>
+                      <select
+                        value={userInput.sceneCount ?? 15}
+                        onChange={(e) => setUserInput(prev => ({ ...prev, sceneCount: Number(e.target.value) }))}
+                        className="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700 focus:border-amber-400 outline-none text-xs font-bold"
+                      >
+                        {SCENE_COUNT_OPTIONS.map(n => (
+                          <option key={n} value={n} className="bg-slate-900">{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2269,38 +2328,36 @@ const App: React.FC = () => {
                     {quickCoverLoading ? 'Generating...' : 'Generate Cover'}
                   </button>
 
-                  {/* Previous designs thumbnails (same session) */}
-                  {(quickCoverHistory.length > 0 || (quickCoverScene?.imageUrl && !quickCoverLoading)) && (
+                  {/* All designs this session – one list, click to select which one is shown/sent */}
+                  {quickCoverDesigns.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Designs this session</p>
                       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                        {quickCoverHistory.map((item, idx) => (
+                        {quickCoverDesigns.map((item, idx) => (
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => setQuickCoverScene({
-                              id: 0,
-                              type: 'front-cover',
-                              title: item.title || 'Cover',
-                              description: 'Front Cover',
-                              prompt: '',
-                              storyText: '',
-                              history: [],
-                              status: 'done',
-                              aspectRatio: '1:1',
-                              generationRatio: '1:1',
-                              imageUrl: item.imageUrl
-                            })}
-                            className="shrink-0 w-16 h-16 rounded-xl border-2 border-slate-600 hover:border-amber-400 overflow-hidden bg-black transition-colors"
+                            onClick={() => {
+                              setSelectedCoverIndex(idx);
+                              setQuickCoverScene({
+                                id: 0,
+                                type: 'front-cover',
+                                title: item.title || 'Cover',
+                                description: 'Front Cover',
+                                prompt: '',
+                                storyText: '',
+                                history: [],
+                                status: 'done',
+                                aspectRatio: '1:1',
+                                generationRatio: '1:1',
+                                imageUrl: item.imageUrl
+                              });
+                            }}
+                            className={`shrink-0 w-16 h-16 rounded-xl border-2 overflow-hidden bg-black transition-colors ${idx === selectedCoverIndex ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-slate-600 hover:border-amber-400'}`}
                           >
                             <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
                           </button>
                         ))}
-                        {quickCoverScene?.imageUrl && !quickCoverLoading && (
-                          <div className="shrink-0 w-16 h-16 rounded-xl border-2 border-amber-400 overflow-hidden bg-black ring-2 ring-amber-400/50" title="Current">
-                            <img src={quickCoverScene.imageUrl} alt="" className="w-full h-full object-cover" />
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -2421,20 +2478,20 @@ const App: React.FC = () => {
                 <div className="hidden lg:block text-slate-400 text-[10px] font-bold uppercase tracking-widest mr-2">
                   {/* Calculate pages ready: Covers (1 each) + Scenes (2 each if split, else 0) */}
                   {storyPlan.scenes.reduce((acc, s, i) => {
-                    if (i === 0 || i === 16) return acc + (s.status === 'done' ? 1 : 0);
+                    if (i === 0 || i === backCoverIndex) return acc + (s.status === 'done' ? 1 : 0);
                     return acc + (s.splitImages ? 2 : 0);
-                  }, 0)} / 32 Pages Ready
+                  }, 0)} / {2 + innerCount * 2} Pages Ready
                 </div>
                 <div className="h-8 w-px bg-slate-700 hidden lg:block"></div>
 
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={() => handleDownloadPDF('SPREADS')} className="bg-green-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 shadow-xl shadow-green-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
                     <i className="fas fa-file-pdf"></i>
-                    <span>PDF (16 Pages)</span>
+                    <span>PDF ({innerCount + 2} Spreads)</span>
                   </button>
                   <button onClick={() => handleDownloadPDF('PAGES')} className="bg-emerald-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-500 shadow-xl shadow-emerald-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95">
                     <i className="fas fa-file-pdf"></i>
-                    <span>PDF (32 Pages)</span>
+                    <span>PDF ({2 + innerCount * 2} Pages)</span>
                   </button>
                   {sheetContext && (
                     <button onClick={handleSendToDrive} disabled={loading} className="bg-blue-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95 disabled:opacity-50">
@@ -2528,8 +2585,8 @@ const App: React.FC = () => {
                             <i className="fas fa-expand"></i>
                           </button>
                         )}
-                        {/* Auto Split Single (Only for Scenes 1-15 that are not yet split) */}
-                        {scene.imageUrl && idx !== 0 && idx !== 16 && !scene.splitImages && (
+                        {/* Auto Split Single (Only for inner scenes that are not yet split) */}
+                        {scene.imageUrl && idx !== 0 && idx !== backCoverIndex && !scene.splitImages && (
                           <button onClick={() => handleAutoSplitSingle(idx)} className="p-2 rounded-lg bg-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 transition-colors" title="Auto Split (2:1)">
                             <i className="fas fa-cut"></i>
                           </button>
