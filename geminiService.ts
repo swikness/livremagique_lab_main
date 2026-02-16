@@ -185,19 +185,29 @@ export const generateStoryPlan = async (input: UserInput): Promise<StoryPlan> =>
 
   const raw = JSON.parse(responseText || '{}');
   console.log("Plan Generated Successfully.");
+  const synopsis = raw.synopsis || '';
   const scenes = Array.isArray(raw.scenes) ? raw.scenes.slice(0, totalScenes) : [];
-  return {
-    synopsis: raw.synopsis || '',
-    scenes: scenes.map((s: any, idx: number) => ({
-      ...s,
-      id: s.id ?? idx,
-      type: idx === 0 ? 'front-cover' : idx === backCoverIndex ? 'back-cover' : 'scene',
-      history: [],
-      status: 'idle',
-      aspectRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9',
-      generationRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9'
-    }))
-  };
+  const mapped = scenes.map((s: any, idx: number) => ({
+    ...s,
+    id: s.id ?? idx,
+    type: idx === 0 ? 'front-cover' : idx === backCoverIndex ? 'back-cover' : 'scene',
+    history: [],
+    status: 'idle' as const,
+    aspectRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9',
+    generationRatio: (idx === 0 || idx === backCoverIndex) ? '1:1' : '16:9'
+  }));
+
+  // Back cover: inject actual synopsis and remove generic "Brand Message" so the image fits the story
+  const backScene = mapped[backCoverIndex];
+  if (backScene && synopsis) {
+    let prompt = backScene.prompt || '';
+    prompt = prompt.replace(/\[Insert the generated Synopsis here\]/gi, synopsis);
+    prompt = prompt.replace(/\[Insert the generated Brand Message here\]/gi, '');
+    prompt = prompt.replace(/AT THE BOTTOM:.*?Brand Message[^.]*\./gi, 'AT THE BOTTOM: Leave space for logo only; do not add any other text.');
+    backScene.prompt = prompt;
+  }
+
+  return { synopsis, scenes: mapped };
 };
 
 export const generateCoverPlan = async (input: UserInput, customInstructions?: string): Promise<Scene> => {

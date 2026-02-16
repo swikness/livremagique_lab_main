@@ -75,16 +75,16 @@ function resolvePlaceholders(
     .replace(/\{\{pronoun\}\}/g, pronoun);
 }
 
-/** Synopsis template per language (chronological 15-scene journey: prepare, moon, suhoor, iftar, through the month to Eid) */
+/** Synopsis template per language (chronological 15-scene journey: intention, moon, suhoor, iftar, sabr, calm, helping, family, learning, sadaqa, evenings, halfway, last days, Eid) */
 const SYNOPSIS: Record<Lang, string> = {
   French:
-    "{{name}} découvre le Ramadan du début à l'Eid : préparatifs et lune, premier suhoor et iftar, patience, calme, entraide et moments en famille, lecture, don et partage, soirées, mi-parcours, derniers jours, puis la fête de l'Eid. Une histoire bienveillante où {{pronoun}} vit chaque étape avec le cœur.",
+    "{{name}} vit le Ramadan du début à l'Eid : une intention sincère, la lune et le calendrier, le premier suhoor et iftar, la patience et la gratitude, des moments de calme, l'entraide et les moments en famille, la lecture et l'apprentissage, le don et la sadaqa, les soirées, la mi-parcours, les derniers jours et la Nuit du Destin, puis la joie de l'Eid. Une histoire bienveillante où {{pronoun}} découvre les valeurs de ce mois avec le cœur.",
   English:
-    "{{name}} discovers Ramadan from start to Eid: preparing and the moon, first suhoor and iftar, patience, quiet moments, helping and family, reading, giving and sharing, evenings, halfway through, last days, then Eid celebration. A heartwarming story where {{pronoun}} lives each step with an open heart.",
+    "{{name}} lives Ramadan from start to Eid: a sincere intention, the moon and the calendar, first suhoor and iftar, patience and gratitude, quiet moments of reflection, helping and family time, reading and learning, giving and sadaqa, peaceful evenings, the halfway point, the last days and the Night of Power, then the joy of Eid. A heartwarming story where {{pronoun}} discovers the values of this month with an open heart.",
   Arabic:
-    "{{name}} يكتشف رمضان من البداية إلى العيد: الاستعداد والقمر وأول سحور وإفطار والصبر والهدوء والمساعدة ولحظات العائلة والقراءة والعطاء والمشاركة والليالي ومنتصف الطريق والأيام الأخيرة ثم العيد. قصة دافئة يعيش فيها {{pronoun}} كل خطوة بقلب مفتوح.",
+    "{{name}} يعيش رمضان من البداية إلى العيد: نية صادقة والقمر والتقويم وأول سحور وإفطار والصبر والشكر ولحظات الهدوء والمساعدة ولحظات العائلة والقراءة والتعلم والعطاء والصدقة والليالي الهادئة ومنتصف الطريق والأيام الأخيرة وليلة القدر ثم فرح العيد. قصة دافئة يكتشف فيها {{pronoun}} قيم هذا الشهر بقلب مفتوح.",
   Spanish:
-    "{{name}} descubre el Ramadán del inicio al Eid: preparativos y luna, primer suhur e iftar, paciencia, calma, ayuda y momentos en familia, lectura, dar y compartir, noches, mitad del camino, últimos días, luego la fiesta del Eid. Una historia entrañable donde {{pronoun}} vive cada paso con el corazón abierto.",
+    "{{name}} vive el Ramadán del inicio al Eid: una intención sincera, la luna y el calendario, el primer suhur e iftar, la paciencia y la gratitud, momentos de calma y reflexión, ayuda y momentos en familia, lectura y aprendizaje, dar y sadaqa, noches tranquilas, la mitad del camino, los últimos días y la Noche del Destino, y luego la alegría del Eid. Una historia entrañable donde {{pronoun}} descubre los valores de este mes con el corazón abierto.",
 };
 
 /** Front cover title per language ({{name}} = child's name) */
@@ -98,8 +98,8 @@ const COVER_TITLE: Record<Lang, string> = {
 /** Front cover image prompt: only the child, Ramadan feel via setting. */
 const COVER_PROMPT = `{STYLE_INSTRUCTION} COMPOSITION: A warm, welcoming scene for a children's book. The Main Character (a child) is the ONLY person in the frame, standing or sitting in a cozy interior or soft outdoor setting with subtle Ramadan atmosphere (e.g. soft lights, a calendar or moon motif in the background, warm colors). No other people. TEXT PLACEMENT: The title text must be placed on a CLEAN, UNCLUTTERED area. Leave natural negative space for the text. CHARACTERS: Only "The Main Character" (the child from the reference photo), facing the camera, in comfortable modest clothing. ${SINGLE_CHARACTER_RULE} LOGO PLACEMENT: Space at the bottom center for the logo. TYPOGRAPHY: BOLD, ELEGANT font contrasting with the background. HEADLINE TEXT: [TITLE_PLACEHOLDER]`;
 
-/** Back cover image prompt: only the child waving/smiling. */
-const BACK_COVER_PROMPT = `Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Reserved for the SYNOPSIS text; uncluttered background. CENTER AREA: Only The Main Character (the child from the reference photo), front view, facing the camera, waving goodbye or smiling warmly. ${SINGLE_CHARACTER_RULE} BOTTOM AREA: Reserved for the BRAND MESSAGE. TEXT INSTRUCTION: 1. AT THE TOP: Render the Synopsis text as provided. 2. AT THE BOTTOM: Render the Brand Message. Use the actual text, no placeholders.`;
+/** Back cover image prompt: only the child waving/smiling. {{SYNOPSIS}} is replaced with the actual story synopsis. */
+const BACK_COVER_PROMPT_TEMPLATE = `Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Uncluttered background. Render this EXACT text at the top (use a clear, readable font): "{{SYNOPSIS}}" CENTER AREA: Only The Main Character (the child from the reference photo), front view, facing the camera, waving goodbye or smiling warmly. ${SINGLE_CHARACTER_RULE} BOTTOM AREA: Leave uncluttered or minimal space for a logo; do NOT add any other text or brand message.`;
 
 /** Inner scene prompt template: side-by-side layout, only the child, then TEXT: {{STORY_TEXT}} */
 function scenePromptTemplate(sceneDescription: string, characterSide: 'LEFT' | 'RIGHT'): string {
@@ -117,12 +117,30 @@ TEXT PLACEMENT: Place the text in the uncluttered area, away from the spine and 
 TEXT: {{STORY_TEXT}}`;
 }
 
-/** Fixed scene templates: 15 inner scenes in chronological order. Content per language; prompt same for all (composition only). */
+/**
+ * Fixed scene templates: 15 inner scenes in chronological order.
+ * Scene index → value + environment (for maintenance):
+ * 1: Intention (niyyah) / preparation — room with calendar, soft dawn light
+ * 2: Lunar calendar / anticipation — balcony or large window at night, crescent moon
+ * 3: Gratitude (shukr) — kitchen or dining nook at dawn, suhoor
+ * 4: Gratitude at iftar — dining area at dusk, table set for iftar
+ * 5: Patience (sabr) — garden, park bench, or sunny backyard
+ * 6: Remembrance / calm — reading nook or window seat, soft light
+ * 7: Kindness / helping — kitchen or hallway, setting table
+ * 8: Family / togetherness — living room with cushions, evening
+ * 9: Learning — small desk or library corner with books
+ * 10: Sadaqa (giving) — porch or doorstep with basket
+ * 11: Sadaqa (smile/kindness) — garden path or front step with bag
+ * 12: Evening gratitude — balcony or window, evening lights
+ * 13: Perseverance — sunny bedroom or window seat, mid-month
+ * 14: Laylat al-Qadr / hope — window at night, stars
+ * 15: Eid joy — front step or yard, morning light, festive clothes
+ */
 const RAMADAN_SCENES: RamadanSceneTemplate[] = [
-  // 1: Preparing for Ramadan
+  // 1: Preparing for Ramadan (intention / niyyah)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a cozy room at home, looking at a calendar or window with a gentle dawn light. Warm, hopeful mood. The child is the only person visible.',
+      'Scene: A child in a room at home with a calendar on the wall and gentle dawn light through the window. Warm, hopeful mood. The child is the only person visible.',
       'RIGHT'
     ),
     content: {
@@ -130,32 +148,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Se préparer pour le Ramadan',
         description: '{{name}} se prépare pour le Ramadan',
         storyText:
-          "C'est bientôt le Ramadan ! {{name}} est tout excité. {{pronounCap}} regarde le calendrier et compte les jours. Pendant ce mois, on jeûne, on réfléchit et on fait de son mieux pour être gentil. {{name}} a hâte de vivre cette aventure avec le cœur.",
+          "C'est bientôt le Ramadan ! {{name}} regarde le calendrier et compte les jours avec joie. Ce mois, on jeûne, on réfléchit et on fait de son mieux pour être gentil. {{pronounCap}} a décidé de vivre cette aventure avec un cœur sincère. {{name}} a appris que bien commencer, c'est déjà une belle intention.",
       },
       English: {
         title: 'Preparing for Ramadan',
         description: '{{name}} prepares for Ramadan',
         storyText:
-          "Ramadan is almost here! {{name}} is so excited. {{pronounCap}} looks at the calendar and counts the days. During this month we fast, reflect and try to be kind. {{name}} can't wait to live this adventure with an open heart.",
+          "Ramadan is almost here! {{name}} looks at the calendar and counts the days with joy. This month we fast, reflect and try our best to be kind. {{pronounCap}} has decided to live this adventure with a sincere heart. {{name}} learned that starting with a good intention is already a beautiful step.",
       },
       Arabic: {
         title: 'الاستعداد لرمضان',
         description: '{{name}} يستعد لرمضان',
         storyText:
-          "رمضان قريب! {{name}} متحمس جداً. {{pronounCap}} ينظر إلى التقويم ويعد الأيام. في هذا الشهر نصوم ونفكر ونحاول أن نكون لطيفين. {{name}} لا يطيق صبراً ليعيش هذه المغامرة بقلب مفتوح.",
+          "رمضان قريب! {{name}} ينظر إلى التقويم ويعد الأيام بفرح. في هذا الشهر نصوم ونفكر ونحاول أن نكون لطيفين. {{pronounCap}} قرر أن يعيش هذه المغامرة بقلب صادق. تعلم {{name}} أن البدء بنية حسنة هو خطوة جميلة.",
       },
       Spanish: {
         title: 'Prepararse para el Ramadán',
         description: '{{name}} se prepara para el Ramadán',
         storyText:
-          "¡Pronto es Ramadán! {{name}} está muy emocionado. {{pronounCap}} mira el calendario y cuenta los días. En este mes ayunamos, reflexionamos y tratamos de ser amables. {{name}} no puede esperar a vivir esta aventura con el corazón abierto.",
+          "¡Pronto es Ramadán! {{name}} mira el calendario y cuenta los días con alegría. Este mes ayunamos, reflexionamos y hacemos lo posible por ser amables. {{pronounCap}} ha decidido vivir esta aventura con el corazón sincero. {{name}} aprendió que empezar con buena intención es ya un paso hermoso.",
       },
     },
   },
-  // 2: Moon and calendar
+  // 2: Moon and calendar (lunar calendar, anticipation)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child looking at a window or outside at night, gentle moon visible or suggested. Calm, hopeful mood. Only the child in frame.',
+      'Scene: A child on a balcony or by a large window at night, the crescent moon visible in the sky. Calm, hopeful mood. Only the child in frame.',
       'RIGHT'
     ),
     content: {
@@ -163,32 +181,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'La lune et le calendrier',
         description: '{{name}} compte les jours',
         storyText:
-          "{{name}} a appris que le Ramadan suit la lune. Chaque soir, {{pronoun}} guette le croissant. Quand on le voit, c'est le début d'un nouveau jour de jeûne. {{pronounCap}} aime compter les jours jusqu'à l'Eid.",
+          "{{name}} a appris que le Ramadan suit la lune. Chaque soir {{pronoun}} guette le croissant dans le ciel. Quand on le voit, un nouveau jour de jeûne commence. {{pronounCap}} aime cette attente et compte les jours jusqu'à l'Eid. {{name}} se sent faire partie de quelque chose de plus grand.",
       },
       English: {
         title: 'The moon and the calendar',
         description: '{{name}} counts the days',
         storyText:
-          "{{name}} learned that Ramadan follows the moon. Each evening {{pronoun}} looks for the crescent. When we see it, a new day of fasting begins. {{pronounCap}} loves counting the days until Eid.",
+          "{{name}} learned that Ramadan follows the moon. Each evening {{pronoun}} looks for the crescent in the sky. When we see it, a new day of fasting begins. {{pronounCap}} loves this waiting and counts the days until Eid. {{name}} feels part of something bigger.",
       },
       Arabic: {
         title: 'القمر والتقويم',
         description: '{{name}} يعد الأيام',
         storyText:
-          "تعلم {{name}} أن رمضان يتبع القمر. كل مساء {{pronoun}} يبحث عن الهلال. عندما نراه، يبدأ يوم جديد من الصيام. {{pronounCap}} يحب عد الأيام حتى العيد.",
+          "تعلم {{name}} أن رمضان يتبع القمر. كل مساء {{pronoun}} يبحث عن الهلال في السماء. عندما نراه، يبدأ يوم جديد من الصيام. {{pronounCap}} يحب هذا الانتظار ويعد الأيام حتى العيد. {{name}} يشعر بأنه جزء من شيء أكبر.",
       },
       Spanish: {
         title: 'La luna y el calendario',
         description: '{{name}} cuenta los días',
         storyText:
-          "{{name}} aprendió que el Ramadán sigue la luna. Cada noche {{pronoun}} busca el creciente. Cuando lo vemos, empieza un nuevo día de ayuno. {{pronounCap}} ama contar los días hasta el Eid.",
+          "{{name}} aprendió que el Ramadán sigue la luna. Cada noche {{pronoun}} busca el creciente en el cielo. Cuando lo vemos, empieza un nuevo día de ayuno. {{pronounCap}} ama esta espera y cuenta los días hasta el Eid. {{name}} siente que es parte de algo más grande.",
       },
     },
   },
-  // 3: First suhoor
+  // 3: First suhoor (gratitude – shukr)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child at a small table at home in the early morning, with a simple breakfast (e.g. dates, water, gentle light). Dawn atmosphere. The child is the only person in the scene.',
+      'Scene: A child in a kitchen or dining nook at dawn, with a simple suhoor setting (dates, water, gentle light). Early morning atmosphere. The child is the only person in the scene.',
       'LEFT'
     ),
     content: {
@@ -196,32 +214,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Le premier suhoor',
         description: "Le premier suhoor de {{name}}",
         storyText:
-          "Ce matin, {{name}} s'est réveillé avant le soleil pour le suhoor. C'est le repas du petit matin qu'on partage en famille avant de jeûner. {{pronounCap}} a mangé des dattes et bu de l'eau. {{name}} était fier de commencer sa première journée de Ramadan.",
+          "Ce matin, {{name}} s'est réveillé avant le soleil pour le suhoor, le repas du petit matin qu'on partage en famille avant de jeûner. {{pronounCap}} a mangé des dattes et bu de l'eau. {{name}} a dit merci dans son cœur pour ce repas et pour la chance de vivre ce mois. {{pronounCap}} a appris que la gratitude rend chaque bouchée plus précieuse.",
       },
       English: {
         title: 'First suhoor',
         description: "{{name}}'s first suhoor",
         storyText:
-          "This morning {{name}} woke up before the sun for suhoor. It's the early meal we share with family before we fast. {{pronounCap}} had dates and water. {{name}} was proud to start {{pronounPossessive}} first day of Ramadan.",
+          "This morning {{name}} woke up before the sun for suhoor, the early meal we share with family before we fast. {{pronounCap}} had dates and water. {{name}} said thank you in {{pronounPossessive}} heart for this meal and for the chance to live this month. {{pronounCap}} learned that gratitude makes every bite more precious.",
       },
       Arabic: {
         title: 'أول سحور',
         description: 'أول سحور لـ {{name}}',
         storyText:
-          "هذا الصباح استيقظ {{name}} قبل الشمس للسحور. إنها وجبة الفجر التي نتشاركها مع العائلة قبل الصيام. {{pronounCap}} أكل التمر وشرب الماء. {{name}} كان فخوراً أن يبدأ أول يوم له في رمضان.",
+          "هذا الصباح استيقظ {{name}} قبل الشمس للسحور، وجبة الفجر التي نتشاركها مع العائلة قبل الصيام. {{pronounCap}} أكل التمر وشرب الماء. {{name}} شكر في قلبه على هذه الوجبة وعلى فرصة عيش هذا الشهر. تعلم {{pronoun}} أن الشكر يجعل كل لقمة أثمن.",
       },
       Spanish: {
         title: 'El primer suhur',
         description: 'El primer suhur de {{name}}',
         storyText:
-          "Esta mañana {{name}} se despertó antes del sol para el suhur. Es la comida del alba que compartimos en familia antes de ayunar. {{pronounCap}} tomó dátiles y agua. {{name}} estaba orgulloso de empezar su primer día de Ramadán.",
+          "Esta mañana {{name}} se despertó antes del sol para el suhur, la comida del alba que compartimos en familia antes de ayunar. {{pronounCap}} tomó dátiles y agua. {{name}} dio las gracias en su corazón por esta comida y por la oportunidad de vivir este mes. {{pronounCap}} aprendió que la gratitud hace cada bocado más precioso.",
       },
     },
   },
-  // 4: First iftar
+  // 4: First iftar (gratitude at breaking the fast)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child at a table set for iftar (dates, water, simple dishes). Warm evening light. The child is alone at the table, smiling, as if about to break the fast. No other people.',
+      'Scene: A child in a dining area at dusk, table set for iftar with dates, water and simple dishes. Warm evening light. The child is alone at the table, smiling, as if about to break the fast. Only the child in frame.',
       'RIGHT'
     ),
     content: {
@@ -229,32 +247,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: "Le premier iftar",
         description: "{{name}} rompt le jeûne",
         storyText:
-          "Le soleil se couche. C'est l'heure de l'iftar ! {{name}} a rompu le jeûne avec une datte et de l'eau, comme on le fait ensemble en famille. {{pronounCap}} a dit merci pour ce moment. {{name}} a senti la joie de partager ce repas après une journée de patience.",
+          "Le soleil se couche. C'est l'heure de l'iftar ! {{name}} a rompu le jeûne avec une datte et de l'eau, comme on le fait en famille. {{pronounCap}} a senti la joie et la gratitude après une journée de patience. {{name}} a compris que dire merci pour ce moment remplit le cœur de paix.",
       },
       English: {
         title: 'First iftar',
         description: "{{name}} breaks the fast",
         storyText:
-          "The sun sets. It's time for iftar! {{name}} broke the fast with a date and water, the way we do together with family. {{pronounCap}} said thank you for this moment. {{name}} felt the joy of sharing this meal after a day of patience.",
+          "The sun sets. It's time for iftar! {{name}} broke the fast with a date and water, the way we do with family. {{pronounCap}} felt joy and gratitude after a day of patience. {{name}} understood that being thankful for this moment fills the heart with peace.",
       },
       Arabic: {
         title: 'أول إفطار',
         description: '{{name}} يفطر',
         storyText:
-          "غربت الشمس. حان وقت الإفطار! {{name}} أفطر بتمرة وماء، كما نفعل مع العائلة. {{pronounCap}} شكر على هذه اللحظة. {{name}} شعر بفرحة مشاركة هذه الوجبة بعد يوم من الصبر.",
+          "غربت الشمس. حان وقت الإفطار! {{name}} أفطر بتمرة وماء، كما نفعل مع العائلة. {{pronounCap}} شعر بفرحة وشكر بعد يوم من الصبر. {{name}} فهم أن الشكر على هذه اللحظة يملأ القلب سلاماً.",
       },
       Spanish: {
         title: 'El primer iftar',
         description: '{{name}} rompe el ayuno',
         storyText:
-          "El sol se pone. ¡Es la hora del iftar! {{name}} rompió el ayuno con un dátil y agua, como hacemos en familia. {{pronounCap}} dio las gracias por este momento. {{name}} sintió la alegría de compartir esta comida después de un día de paciencia.",
+          "El sol se pone. ¡Es la hora del iftar! {{name}} rompió el ayuno con un dátil y agua, como hacemos en familia. {{pronounCap}} sintió alegría y gratitud después de un día de paciencia. {{name}} entendió que agradecer este momento llena el corazón de paz.",
       },
     },
   },
-  // 5: Patience during the day
+  // 5: Patience during the day (sabr)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in daytime, perhaps near a window or in a room, calm and patient expression. Midday light. Only the child in frame.',
+      'Scene: A child in a garden, on a park bench, or in a sunny backyard in the daytime. Calm, patient expression. Only the child in frame.',
       'RIGHT'
     ),
     content: {
@@ -262,32 +280,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'La patience en journée',
         description: '{{name}} reste patient',
         storyText:
-          "En plein jour, {{name}} a parfois soif ou faim. C'est normal pendant le jeûne. {{pronounCap}} choisit la patience et pense à ceux qui n'ont pas toujours à manger. Ça donne du courage.",
+          "En plein jour, {{name}} a parfois soif ou faim. C'est normal pendant le jeûne. {{pronounCap}} choisit la patience et pense à ceux qui n'ont pas toujours de quoi manger. {{name}} a appris que la patience rend le cœur plus fort et nous rapproche des autres.",
       },
       English: {
         title: 'Patience during the day',
         description: '{{name}} stays patient',
         storyText:
-          "In the middle of the day {{name}} sometimes feels thirsty or hungry. That's part of fasting. {{pronounCap}} chooses patience and thinks of those who don't always have enough to eat. It gives {{pronoun}} strength.",
+          "In the middle of the day {{name}} sometimes feels thirsty or hungry. That's part of fasting. {{pronounCap}} chooses patience and thinks of those who don't always have enough to eat. {{name}} learned that patience makes the heart stronger and brings us closer to others.",
       },
       Arabic: {
         title: 'الصبر في النهار',
         description: '{{name}} يتحلى بالصبر',
         storyText:
-          "في منتصف النهار يشعر {{name}} أحياناً بالعطش أو الجوع. هذا جزء من الصيام. {{pronounCap}} يختار الصبر ويفكر في من لا يجدون ما يأكلون. ذلك يعطيه قوة.",
+          "في منتصف النهار يشعر {{name}} أحياناً بالعطش أو الجوع. هذا جزء من الصيام. {{pronounCap}} يختار الصبر ويفكر في من لا يجدون ما يأكلون. تعلم {{name}} أن الصبر يقوي القلب ويقربنا من الآخرين.",
       },
       Spanish: {
         title: 'Paciencia durante el día',
         description: '{{name}} mantiene la paciencia',
         storyText:
-          "A mediodía {{name}} a veces tiene sed o hambre. Es parte del ayuno. {{pronounCap}} elige la paciencia y piensa en quienes no siempre tienen qué comer. Eso le da fuerza.",
+          "A mediodía {{name}} a veces tiene sed o hambre. Es parte del ayuno. {{pronounCap}} elige la paciencia y piensa en quienes no siempre tienen qué comer. {{name}} aprendió que la paciencia fortalece el corazón y nos acerca a los demás.",
       },
     },
   },
-  // 6: Quiet moment
+  // 6: Quiet moment (remembrance / calm)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a quiet corner of a room, peaceful pose, soft light. Calm, reflective mood. Only the child in frame.',
+      'Scene: A child in a reading nook or on a window seat, soft light, peaceful and reflective pose. Calm mood. Only the child in frame.',
       'LEFT'
     ),
     content: {
@@ -295,32 +313,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Un moment de calme',
         description: '{{name}} se recueille',
         storyText:
-          "Parfois {{name}} s'assoit au calme pour réfléchir. Pendant le Ramadan, on prend le temps de dire merci et de penser aux autres. {{pronounCap}} ferme les yeux et sent la paix dans son cœur.",
+          "Parfois {{name}} s'assoit au calme pour réfléchir. Pendant le Ramadan, on prend le temps de dire merci et de penser à ce qui compte. {{pronounCap}} ferme les yeux et sent la paix dans son cœur. {{name}} a appris que ces moments de calme aident à garder le cœur léger.",
       },
       English: {
         title: 'A quiet moment',
         description: '{{name}} reflects',
         storyText:
-          "Sometimes {{name}} sits quietly to think. During Ramadan we take time to say thank you and think of others. {{pronounCap}} closes {{pronounPossessive}} eyes and feels peace in {{pronounPossessive}} heart.",
+          "Sometimes {{name}} sits quietly to think. During Ramadan we take time to say thank you and to think about what matters. {{pronounCap}} closes {{pronounPossessive}} eyes and feels peace in {{pronounPossessive}} heart. {{name}} learned that these quiet moments help keep the heart light.",
       },
       Arabic: {
         title: 'لحظة هدوء',
         description: '{{name}} يتأمل',
         storyText:
-          "أحياناً يجلس {{name}} بهدوء ليفكر. في رمضان نأخذ وقتاً لنشكر ونتذكر الآخرين. {{pronounCap}} يغلق عينيه ويشعر بالسلام في قلبه.",
+          "أحياناً يجلس {{name}} بهدوء ليفكر. في رمضان نأخذ وقتاً لنشكر ونتأمل ما يهم. {{pronounCap}} يغلق عينيه ويشعر بالسلام في قلبه. تعلم {{name}} أن لحظات الهدوء هذه تساعد القلب أن يبقى خفيفاً.",
       },
       Spanish: {
         title: 'Un momento de calma',
         description: '{{name}} reflexiona',
         storyText:
-          "A veces {{name}} se sienta en silencio para pensar. Durante el Ramadán dedicamos tiempo a dar las gracias y pensar en los demás. {{pronounCap}} cierra los ojos y siente paz en su corazón.",
+          "A veces {{name}} se sienta en silencio para pensar. Durante el Ramadán dedicamos tiempo a dar las gracias y a pensar en lo que importa. {{pronounCap}} cierra los ojos y siente paz en su corazón. {{name}} aprendió que estos momentos de calma ayudan a mantener el corazón ligero.",
       },
     },
   },
-  // 7: Helping at home
+  // 7: Helping at home (kindness)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child tidying or setting a table at home, helpful pose. Warm family atmosphere suggested by setting; only the child visible.',
+      'Scene: A child in a kitchen or hallway, setting the table or holding dishes. Helpful, gentle pose. Only the child visible.',
       'RIGHT'
     ),
     content: {
@@ -328,32 +346,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Aider à la maison',
         description: '{{name}} donne un coup de main',
         storyText:
-          "{{name}} aide à la maison pendant le Ramadan. Mettre la table, ranger sa chambre : de petits gestes qui font plaisir. {{pronounCap}} apprend que rendre service fait partie des belles valeurs de ce mois.",
+          "{{name}} aide à la maison pendant le Ramadan : mettre la table, ranger sa chambre. Ce sont de petits gestes qui font plaisir à ceux qu'on aime. {{pronounCap}} a appris que rendre service avec le cœur est une belle façon de montrer qu'on tient aux autres.",
       },
       English: {
         title: 'Helping at home',
         description: '{{name}} lends a hand',
         storyText:
-          "{{name}} helps at home during Ramadan. Setting the table, tidying {{pronounPossessive}} room: small gestures that bring joy. {{pronounCap}} learns that being helpful is part of the values of this month.",
+          "{{name}} helps at home during Ramadan: setting the table, tidying {{pronounPossessive}} room. These are small gestures that bring joy to the people we love. {{pronounCap}} learned that helping with a kind heart is a beautiful way to show we care.",
       },
       Arabic: {
         title: 'المساعدة في البيت',
         description: '{{name}} يساعد',
         storyText:
-          "{{name}} يساعد في البيت أثناء رمضان. ترتيب المائدة أو الغرفة: حركات صغيرة تسعد الآخرين. {{pronounCap}} يتعلم أن المساعدة من قيم هذا الشهر.",
+          "{{name}} يساعد في البيت أثناء رمضان: ترتيب المائدة أو الغرفة. حركات صغيرة تسعد من نحب. {{pronounCap}} تعلم أن المساعدة بقلب طيب طريقة جميلة لنظهر اهتمامنا.",
       },
       Spanish: {
         title: 'Ayudar en casa',
         description: '{{name}} echa una mano',
         storyText:
-          "{{name}} ayuda en casa durante el Ramadán. Poner la mesa, ordenar su habitación: pequeños gestos que alegran. {{pronounCap}} aprende que ayudar es parte de los valores de este mes.",
+          "{{name}} ayuda en casa durante el Ramadán: poner la mesa, ordenar su habitación. Son pequeños gestos que alegran a quienes queremos. {{pronounCap}} aprendió que ayudar con el corazón es una forma hermosa de mostrar que nos importan.",
       },
     },
   },
-  // 8: Family moments
+  // 8: Family moments (togetherness)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a cozy living space, perhaps holding a book or sitting quietly. Warm, peaceful atmosphere. Family is evoked by the setting (e.g. cushions, warm light) but only the child is visible.',
+      'Scene: A child in a living room with cushions and a warm lamp, evening atmosphere. Peaceful. Only the child is visible.',
       'LEFT'
     ),
     content: {
@@ -361,32 +379,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Les moments en famille',
         description: 'Des moments doux avec {{name}}',
         storyText:
-          "Les soirées de Ramadan, {{name}} aime les moments calmes à la maison. Parfois on lit, parfois on parle. {{pronounCap}} apprend à être patient et à écouter. Ces moments avec les gens qu'on aime remplissent le cœur de {{name}}.",
+          "Les soirées de Ramadan, {{name}} aime les moments calmes à la maison. Parfois on lit, parfois on parle. {{pronounCap}} apprend à écouter et à être présent. {{name}} a compris que ces moments avec les gens qu'on aime sont un vrai trésor.",
       },
       English: {
         title: 'Family moments',
         description: 'Quiet moments with {{name}}',
         storyText:
-          "During Ramadan evenings, {{name}} loves quiet moments at home. Sometimes we read, sometimes we talk. {{pronounCap}} learns to be patient and to listen. These moments with the people we love fill {{name}}'s heart.",
+          "During Ramadan evenings, {{name}} loves quiet moments at home. Sometimes we read, sometimes we talk. {{pronounCap}} learns to listen and to be present. {{name}} understood that these moments with the people we love are a real treasure.",
       },
       Arabic: {
         title: 'لحظات مع العائلة',
         description: 'لحظات هادئة مع {{name}}',
         storyText:
-          "في ليالي رمضان، يحب {{name}} اللحظات الهادئة في البيت. أحياناً نقرأ، أحياناً نتحدث. {{pronounCap}} يتعلم الصبر والاستماع. هذه اللحظات مع من نحب تملأ قلب {{name}}.",
+          "في ليالي رمضان، يحب {{name}} اللحظات الهادئة في البيت. أحياناً نقرأ، أحياناً نتحدث. {{pronounCap}} يتعلم الاستماع والحضور. {{name}} فهم أن هذه اللحظات مع من نحب كنز حقيقي.",
       },
       Spanish: {
         title: 'Momentos en familia',
         description: 'Momentos tranquilos con {{name}}',
         storyText:
-          "En las noches de Ramadán, a {{name}} le encantan los momentos tranquilos en casa. A veces leemos, a veces hablamos. {{pronounCap}} aprende a ser paciente y a escuchar. Estos momentos con quienes queremos llenan el corazón de {{name}}.",
+          "En las noches de Ramadán, a {{name}} le encantan los momentos tranquilos en casa. A veces leemos, a veces hablamos. {{pronounCap}} aprende a escuchar y a estar presente. {{name}} entendió que estos momentos con quienes queremos son un verdadero tesoro.",
       },
     },
   },
-  // 9: Reading and learning
+  // 9: Reading and learning (curiosity, growing)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child with a book or looking at something with curiosity, in a cozy corner. Learning mood. Only the child in frame.',
+      'Scene: A child at a small desk or in a library corner with books, curious and focused. Learning mood. Only the child in frame.',
       'LEFT'
     ),
     content: {
@@ -394,32 +412,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Lire et apprendre',
         description: '{{name}} découvre',
         storyText:
-          "{{name}} aime lire et apprendre pendant le Ramadan. Des histoires, des mots doux, des choses sur ce mois si spécial. {{pronounCap}} pose des questions et grandit en comprenant mieux.",
+          "{{name}} aime lire et apprendre pendant le Ramadan. Des histoires, des mots doux, des choses sur ce mois si spécial. {{pronounCap}} pose des questions et grandit en comprenant mieux. {{name}} a appris que chercher à comprendre est une belle valeur.",
       },
       English: {
         title: 'Reading and learning',
         description: '{{name}} discovers',
         storyText:
-          "{{name}} loves to read and learn during Ramadan. Stories, kind words, things about this special month. {{pronounCap}} asks questions and grows by understanding more.",
+          "{{name}} loves to read and learn during Ramadan. Stories, kind words, things about this special month. {{pronounCap}} asks questions and grows by understanding more. {{name}} learned that wanting to understand is a beautiful value.",
       },
       Arabic: {
         title: 'القراءة والتعلم',
         description: '{{name}} يكتشف',
         storyText:
-          "{{name}} يحب القراءة والتعلم في رمضان. قصص وكلمات طيبة وأشياء عن هذا الشهر الخاص. {{pronounCap}} يطرح أسئلة ويكبر بفهم أكثر.",
+          "{{name}} يحب القراءة والتعلم في رمضان. قصص وكلمات طيبة وأشياء عن هذا الشهر الخاص. {{pronounCap}} يطرح أسئلة ويكبر بفهم أكثر. تعلم {{name}} أن الرغبة في الفهم قيمة جميلة.",
       },
       Spanish: {
         title: 'Leer y aprender',
         description: '{{name}} descubre',
         storyText:
-          "A {{name}} le encanta leer y aprender durante el Ramadán. Historias, palabras amables, cosas sobre este mes tan especial. {{pronounCap}} hace preguntas y crece entendiendo más.",
+          "A {{name}} le encanta leer y aprender durante el Ramadán. Historias, palabras amables, cosas sobre este mes tan especial. {{pronounCap}} hace preguntas y crece entendiendo más. {{name}} aprendió que querer entender es un valor hermoso.",
       },
     },
   },
-  // 10: Giving and sharing
+  // 10: Giving and sharing (sadaqa)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child holding a small gift, a coin box, or a bag of food to give. Kind, generous mood. Setting: home or a neutral place. Only the child is visible.',
+      'Scene: A child on a porch or at the doorstep with a small basket or gift to give. Kind, generous mood. Only the child is visible.',
       'RIGHT'
     ),
     content: {
@@ -427,32 +445,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Donner et partager',
         description: '{{name}} donne avec le cœur',
         storyText:
-          "Pendant le Ramadan, {{name}} apprend à donner. Donner un peu de ce qu'on a, ou du temps, ou un sourire, c'est la sadaqa. {{pronounCap}} a préparé un petit geste pour quelqu'un. {{name}} a compris que partager rend le cœur léger.",
+          "Pendant le Ramadan, {{name}} apprend à donner. Donner un peu de ce qu'on a, ou du temps, ou un sourire, c'est la sadaqa. {{pronounCap}} a préparé un petit geste pour quelqu'un. {{name}} a compris que partager rend le cœur léger et que chaque geste compte.",
       },
       English: {
         title: 'Giving and sharing',
         description: "{{name}} gives from the heart",
         storyText:
-          "During Ramadan, {{name}} learns to give. Giving a little of what we have, or our time, or a smile, is sadaqa. {{pronounCap}} prepared a small gesture for someone. {{name}} understood that sharing makes the heart light.",
+          "During Ramadan, {{name}} learns to give. Giving a little of what we have, or our time, or a smile, is sadaqa. {{pronounCap}} prepared a small gesture for someone. {{name}} understood that sharing makes the heart light and that every gesture counts.",
       },
       Arabic: {
         title: 'العطاء والمشاركة',
         description: '{{name}} يعطي من القلب',
         storyText:
-          "في رمضان يتعلم {{name}} العطاء. أن نعطي قليلاً مما لدينا، أو وقتنا، أو ابتسامة، هو صدقة. {{pronounCap}} أعد لمسة صغيرة لأحد. {{name}} فهم أن المشاركة تخفف القلب.",
+          "في رمضان يتعلم {{name}} العطاء. أن نعطي قليلاً مما لدينا، أو وقتنا، أو ابتسامة، هو صدقة. {{pronounCap}} أعد لمسة صغيرة لأحد. {{name}} فهم أن المشاركة تخفف القلب وأن كل لمسة لها ثقل.",
       },
       Spanish: {
         title: 'Dar y compartir',
         description: '{{name}} da con el corazón',
         storyText:
-          "Durante el Ramadán, {{name}} aprende a dar. Dar un poco de lo que tenemos, o nuestro tiempo, o una sonrisa, es sadaqa. {{pronounCap}} preparó un pequeño gesto para alguien. {{name}} entendió que compartir aligera el corazón.",
+          "Durante el Ramadán, {{name}} aprende a dar. Dar un poco de lo que tenemos, o nuestro tiempo, o una sonrisa, es sadaqa. {{pronounCap}} preparó un pequeño gesto para alguien. {{name}} entendió que compartir aligera el corazón y que cada gesto cuenta.",
       },
     },
   },
-  // 11: Sharing with others
+  // 11: Sharing with others (sadaqa – smile and kindness)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child holding a small gift, basket, or package to give. Kind, generous expression. Only the child in frame.',
+      'Scene: A child on a garden path or front step with a bag or basket to give. Kind, generous expression. Only the child in frame.',
       'LEFT'
     ),
     content: {
@@ -460,32 +478,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Partager avec les autres',
         description: '{{name}} prépare un don',
         storyText:
-          "{{name}} a préparé un petit cadeau pour quelqu'un. Donner, même un peu, rend le cœur léger. {{pronounCap}} sait que la sadaqa peut être un sourire ou un geste gentil, pas seulement de l'argent.",
+          "{{name}} a préparé un petit cadeau pour quelqu'un. Donner, même un peu, rend le cœur léger. {{pronounCap}} sait que la sadaqa peut être un sourire, un geste gentil ou une attention, pas seulement de l'argent. {{name}} a appris que la gentillesse est un trésor.",
       },
       English: {
         title: 'Sharing with others',
         description: '{{name}} prepares a gift',
         storyText:
-          "{{name}} prepared a small gift for someone. Giving, even a little, makes the heart light. {{pronounCap}} knows that sadaqa can be a smile or a kind gesture, not only money.",
+          "{{name}} prepared a small gift for someone. Giving, even a little, makes the heart light. {{pronounCap}} knows that sadaqa can be a smile, a kind gesture or a thoughtfulness, not only money. {{name}} learned that kindness is a treasure.",
       },
       Arabic: {
         title: 'المشاركة مع الآخرين',
         description: '{{name}} يعد هدية',
         storyText:
-          "أعد {{name}} هدية صغيرة لأحد. العطاء، ولو قليل، يخفف القلب. {{pronounCap}} يعرف أن الصدقة قد تكون ابتسامة أو لطفاً، وليس المال فقط.",
+          "أعد {{name}} هدية صغيرة لأحد. العطاء، ولو قليل، يخفف القلب. {{pronounCap}} يعرف أن الصدقة قد تكون ابتسامة أو لطفاً أو اهتماماً، وليس المال فقط. تعلم {{name}} أن اللطف كنز.",
       },
       Spanish: {
         title: 'Compartir con los demás',
         description: '{{name}} prepara un regalo',
         storyText:
-          "{{name}} preparó un pequeño regalo para alguien. Dar, aunque sea un poco, aligera el corazón. {{pronounCap}} sabe que la sadaqa puede ser una sonrisa o un gesto amable, no solo dinero.",
+          "{{name}} preparó un pequeño regalo para alguien. Dar, aunque sea un poco, aligera el corazón. {{pronounCap}} sabe que la sadaqa puede ser una sonrisa, un gesto amable o un detalle, no solo dinero. {{name}} aprendió que la bondad es un tesoro.",
       },
     },
   },
-  // 12: Ramadan evenings
+  // 12: Ramadan evenings (gratitude, closeness)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a cozy evening setting, soft lights, peaceful night mood. Only the child in frame.',
+      'Scene: A child on a balcony or by a window with evening lights, peaceful night mood. Only the child in frame.',
       'RIGHT'
     ),
     content: {
@@ -493,32 +511,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: "Les soirées de Ramadan",
         description: '{{name}} le soir',
         storyText:
-          "Le soir, après l'iftar, l'ambiance est douce. {{name}} aime ces moments où la nuit tombe et tout est calme. {{pronounCap}} se sent proche des gens qu'{{pronoun}} aime, même sans les voir dans l'image.",
+          "Le soir, après l'iftar, l'ambiance est douce. {{name}} aime ces moments où la nuit tombe et tout est calme. {{pronounCap}} se sent proche des gens qu'{{pronoun}} aime. {{name}} a appris à dire merci pour ces soirées si précieuses.",
       },
       English: {
         title: 'Ramadan evenings',
         description: "{{name}} in the evening",
         storyText:
-          "In the evening, after iftar, the mood is gentle. {{name}} loves these moments when night falls and everything is calm. {{pronounCap}} feels close to the people {{pronoun}} loves.",
+          "In the evening, after iftar, the mood is gentle. {{name}} loves these moments when night falls and everything is calm. {{pronounCap}} feels close to the people {{pronoun}} loves. {{name}} learned to be thankful for these precious evenings.",
       },
       Arabic: {
         title: 'ليالي رمضان',
         description: '{{name}} في المساء',
         storyText:
-          "في المساء بعد الإفطار، الأجواء هادئة. {{name}} يحب هذه اللحظات عندما يرخي الليل وكل شيء ساكن. {{pronounCap}} يشعر بالقرب ممن يحب.",
+          "في المساء بعد الإفطار، الأجواء هادئة. {{name}} يحب هذه اللحظات عندما يرخي الليل وكل شيء ساكن. {{pronounCap}} يشعر بالقرب ممن يحب. تعلم {{name}} أن يشكر على هذه الليالي الثمينة.",
       },
       Spanish: {
         title: 'Las noches de Ramadán',
         description: '{{name}} por la noche',
         storyText:
-          "Por la noche, después del iftar, el ambiente es tranquilo. {{name}} ama esos momentos en que cae la noche y todo está en calma. {{pronounCap}} se siente cerca de quienes quiere.",
+          "Por la noche, después del iftar, el ambiente es tranquilo. {{name}} ama esos momentos en que cae la noche y todo está en calma. {{pronounCap}} se siente cerca de quienes quiere. {{name}} aprendió a estar agradecido por estas noches tan preciosas.",
       },
     },
   },
-  // 13: Halfway through Ramadan
+  // 13: Halfway through Ramadan (perseverance)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a cozy room, gentle daylight, hopeful and proud expression. Mid-Ramadan mood. Only the child in frame.',
+      'Scene: A child in a sunny bedroom or on a window seat, gentle daylight, hopeful and proud expression. Mid-Ramadan mood. Only the child in frame.',
       'LEFT'
     ),
     content: {
@@ -526,32 +544,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'À mi-chemin du Ramadan',
         description: '{{name}} à mi-parcours',
         storyText:
-          "Nous voilà à mi-chemin du Ramadan ! {{name}} est fier de ses efforts. {{pronounCap}} a jeûné, partagé et réfléchi. {{name}} continue avec le cœur plein et garde le cap jusqu'à l'Eid.",
+          "Nous voilà à mi-chemin du Ramadan ! {{name}} est fier de ses efforts. {{pronounCap}} a jeûné, partagé et réfléchi. {{name}} continue avec le cœur plein et garde le cap jusqu'à l'Eid. {{pronounCap}} a appris que persévérer est une force.",
       },
       English: {
         title: 'Halfway through Ramadan',
         description: '{{name}} at the halfway point',
         storyText:
-          "We're halfway through Ramadan! {{name}} is proud of {{pronounPossessive}} efforts. {{pronounCap}} has fasted, shared and reflected. {{name}} keeps going with a full heart toward Eid.",
+          "We're halfway through Ramadan! {{name}} is proud of {{pronounPossessive}} efforts. {{pronounCap}} has fasted, shared and reflected. {{name}} keeps going with a full heart toward Eid. {{pronounCap}} learned that perseverance is a strength.",
       },
       Arabic: {
         title: 'منتصف رمضان',
         description: '{{name}} في منتصف الطريق',
         storyText:
-          "ها نحن في منتصف رمضان! {{name}} فخور بما بذله. {{pronounCap}} صام وشارك وتأمل. {{name}} يواصل بقلب ممتلئ حتى العيد.",
+          "ها نحن في منتصف رمضان! {{name}} فخور بما بذله. {{pronounCap}} صام وشارك وتأمل. {{name}} يواصل بقلب ممتلئ حتى العيد. {{pronounCap}} تعلم أن المثابرة قوة.",
       },
       Spanish: {
         title: 'A mitad del Ramadán',
         description: '{{name}} a mitad de camino',
         storyText:
-          "¡Estamos a mitad del Ramadán! {{name}} está orgulloso de sus esfuerzos. {{pronounCap}} ha ayunado, compartido y reflexionado. {{name}} sigue con el corazón lleno hacia el Eid.",
+          "¡Estamos a mitad del Ramadán! {{name}} está orgulloso de sus esfuerzos. {{pronounCap}} ha ayunado, compartido y reflexionado. {{name}} sigue con el corazón lleno hacia el Eid. {{pronounCap}} aprendió que perseverar es una fuerza.",
       },
     },
   },
-  // 14: Last days / Laylat al-Qadr
+  // 14: Last days / Laylat al-Qadr (hope, special night)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a hopeful, gentle night or dusk setting. Sense of specialness, last days of Ramadan. Only the child in frame.',
+      'Scene: A child by a window or in a quiet spot at night, stars visible, gentle and hopeful. Last days of Ramadan. Only the child in frame.',
       'LEFT'
     ),
     content: {
@@ -559,32 +577,32 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: 'Les derniers jours',
         description: '{{name}} et la Nuit du Destin',
         storyText:
-          "Nous voilà dans les derniers jours du Ramadan. {{name}} a entendu parler de la Nuit du Destin, une nuit si précieuse. {{pronounCap}} garde l'espoir et la gratitude dans son cœur.",
+          "Nous voilà dans les derniers jours du Ramadan. {{name}} a entendu parler de la Nuit du Destin, une nuit si précieuse. {{pronounCap}} garde l'espoir et la gratitude dans son cœur. {{name}} a appris que croire en ces moments spéciaux remplit le cœur de lumière.",
       },
       English: {
         title: 'The last days',
         description: '{{name}} and the Night of Power',
         storyText:
-          "We are in the last days of Ramadan. {{name}} has heard about the Night of Power, such a precious night. {{pronounCap}} keeps hope and gratitude in {{pronounPossessive}} heart.",
+          "We are in the last days of Ramadan. {{name}} has heard about the Night of Power, such a precious night. {{pronounCap}} keeps hope and gratitude in {{pronounPossessive}} heart. {{name}} learned that believing in these special moments fills the heart with light.",
       },
       Arabic: {
         title: 'الأيام الأخيرة',
         description: '{{name}} وليلة القدر',
         storyText:
-          "ها نحن في الأيام الأخيرة من رمضان. سمع {{name}} عن ليلة القدر، ليلة ثمينة. {{pronounCap}} يحتفظ بالأمل والشكر في قلبه.",
+          "ها نحن في الأيام الأخيرة من رمضان. سمع {{name}} عن ليلة القدر، ليلة ثمينة. {{pronounCap}} يحتفظ بالأمل والشكر في قلبه. تعلم {{name}} أن الإيمان بهذه اللحظات الخاصة يملأ القلب نوراً.",
       },
       Spanish: {
         title: 'Los últimos días',
         description: '{{name}} y la Noche del Destino',
         storyText:
-          "Estamos en los últimos días del Ramadán. {{name}} ha oído hablar de la Noche del Destino, una noche tan preciosa. {{pronounCap}} guarda esperanza y gratitud en su corazón.",
+          "Estamos en los últimos días del Ramadán. {{name}} ha oído hablar de la Noche del Destino, una noche tan preciosa. {{pronounCap}} guarda esperanza y gratitud en su corazón. {{name}} aprendió que creer en estos momentos especiales llena el corazón de luz.",
       },
     },
   },
-  // 15: Eid (morning + celebration)
+  // 15: Eid (joy, gratitude after the journey)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in festive but modest clothing, morning light, smiling and ready for Eid. Joyful. Only the child in frame.',
+      'Scene: A child on the front step or in the yard in morning light, in festive but modest clothing, smiling and ready for Eid. Joyful. Only the child in frame.',
       'RIGHT'
     ),
     content: {
@@ -592,25 +610,25 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
         title: "L'Eid !",
         description: "{{name}} fête l'Eid",
         storyText:
-          "Le Ramadan s'achève. C'est le matin de l'Eid ! {{name}} s'est réveillé avec le cœur léger. {{pronounCap}} a mis {{pronounPossessive}} plus beaux habits et est prêt à fêter. Après un mois de patience, partage et gratitude, la joie est là.",
+          "Le Ramadan s'achève. C'est le matin de l'Eid ! {{name}} s'est réveillé avec le cœur léger. {{pronounCap}} a mis {{pronounPossessive}} plus beaux habits et est prêt à fêter. Après un mois de patience, partage et gratitude, la joie est là. {{name}} a appris que chaque effort porté avec le cœur mène à la joie.",
       },
       English: {
         title: 'Eid!',
         description: "{{name}} celebrates Eid",
         storyText:
-          "Ramadan has ended. It's Eid morning! {{name}} woke up with a light heart. {{pronounCap}} put on {{pronounPossessive}} best clothes and is ready to celebrate. After a month of patience, sharing and gratitude, joy is here.",
+          "Ramadan has ended. It's Eid morning! {{name}} woke up with a light heart. {{pronounCap}} put on {{pronounPossessive}} best clothes and is ready to celebrate. After a month of patience, sharing and gratitude, joy is here. {{name}} learned that every effort made with the heart leads to joy.",
       },
       Arabic: {
         title: 'العيد!',
         description: '{{name}} يحتفل بالعيد',
         storyText:
-          "انتهى رمضان. إنه صباح العيد! استيقظ {{name}} بقلب خفيف. {{pronounCap}} ارتدى أجمل ثيابه وهو مستعد للاحتفال. بعد شهر من الصبر والمشاركة والشكر، الفرح هنا.",
+          "انتهى رمضان. إنه صباح العيد! استيقظ {{name}} بقلب خفيف. {{pronounCap}} ارتدى أجمل ثيابه وهو مستعد للاحتفال. بعد شهر من الصبر والمشاركة والشكر، الفرح هنا. تعلم {{name}} أن كل جهد بقلب صادق يقود إلى الفرح.",
       },
       Spanish: {
         title: '¡Eid!',
         description: '{{name}} celebra el Eid',
         storyText:
-          "El Ramadán ha terminado. ¡Es la mañana del Eid! {{name}} se despertó con el corazón ligero. {{pronounCap}} se puso su mejor ropa y está listo para celebrar. Después de un mes de paciencia, compartir y gratitud, la alegría está aquí.",
+          "El Ramadán ha terminado. ¡Es la mañana del Eid! {{name}} se despertó con el corazón ligero. {{pronounCap}} se puso su mejor ropa y está listo para celebrar. Después de un mes de paciencia, compartir y gratitud, la alegría está aquí. {{name}} aprendió que cada esfuerzo hecho con el corazón lleva a la alegría.",
       },
     },
   },
@@ -680,8 +698,8 @@ export function buildRamadanStoryPlan(input: UserInput): StoryPlan {
     });
   }
 
-  // Back cover
-  const backPrompt = BACK_COVER_PROMPT;
+  // Back cover: inject actual synopsis so the image shows the story summary, not placeholder or brand text
+  const backPrompt = BACK_COVER_PROMPT_TEMPLATE.replace('{{SYNOPSIS}}', synopsis);
   scenes.push({
     id: BACK_COVER_INDEX,
     type: 'back-cover',

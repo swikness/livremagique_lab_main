@@ -145,16 +145,26 @@ export async function generateStoryPlan(input) {
   const result = await model.generateContent(prompt);
   const text = result.response.text();
   const raw = JSON.parse(text || '{}');
-  return {
-    synopsis: raw.synopsis || '',
-    scenes: (raw.scenes || []).map((s, idx) => ({
-      ...s,
-      history: [],
-      status: 'idle',
-      aspectRatio: idx === 0 || idx === 16 ? '1:1' : '16:9',
-      generationRatio: idx === 0 || idx === 16 ? '1:1' : '16:9',
-    })),
-  };
+  const synopsis = raw.synopsis || '';
+  const scenes = (raw.scenes || []).map((s, idx) => ({
+    ...s,
+    history: [],
+    status: 'idle',
+    aspectRatio: idx === 0 || idx === 16 ? '1:1' : '16:9',
+    generationRatio: idx === 0 || idx === 16 ? '1:1' : '16:9',
+  }));
+
+  // Back cover: inject actual synopsis and remove generic "Brand Message" so the image fits the story
+  const backScene = scenes[16];
+  if (backScene && synopsis) {
+    let p = backScene.prompt || '';
+    p = p.replace(/\[Insert the generated Synopsis here\]/gi, synopsis);
+    p = p.replace(/\[Insert the generated Brand Message here\]/gi, '');
+    p = p.replace(/AT THE BOTTOM:.*?Brand Message[^.]*\./gi, 'AT THE BOTTOM: Leave space for logo only; do not add any other text.');
+    backScene.prompt = p;
+  }
+
+  return { synopsis, scenes };
 }
 
 export async function generateSceneImage(scene, baseStyle, mainCharacterPhoto, partnerPhoto, logoBase64 = null) {

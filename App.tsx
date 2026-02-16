@@ -1686,46 +1686,36 @@ const App: React.FC = () => {
           return;
         }
 
-        // Portrait page for individual pages (covers & split halves)
-        const pageW = 576;
-        const pageH = 1024;
-        const doc = new jsPDF({
-          orientation: 'portrait',
-          unit: 'px',
-          format: [pageW, pageH]
-        });
+        // Square pages for individual pages (covers & split halves) — all pages same square size
+        const PAGE = 576;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE, PAGE] });
 
-        // Page 1: Front Cover (scene 0) - 1:1 image centered on portrait page
+        // Page 1: Front Cover (scene 0) — full square page
         const frontCoverImg = storyPlan.scenes[0].imageUrl!;
-        // Fit 1:1 image into portrait page: width = pageW, height = pageW (square), centered vertically
-        const coverSize = pageW;
-        const coverY = (pageH - coverSize) / 2;
-        doc.addImage(frontCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
+        doc.addImage(frontCoverImg, 'JPEG', 0, 0, PAGE, PAGE);
 
-        // Pages 2 to 2+2*innerCount: Scene split images (2 pages per inner scene)
+        // Pages 2 to 2+2*innerCount: Scene split images (2 square pages per inner scene)
         for (let i = 1; i <= innerCount; i++) {
           const scene = storyPlan.scenes[i];
           const [leftImg, rightImg] = scene.splitImages!;
 
           if (isRTL) {
-            // RTL: right page first, then left page
-            doc.addPage([pageW, pageH]);
-            doc.addImage(rightImg, 'JPEG', 0, coverY, coverSize, coverSize);
-            doc.addPage([pageW, pageH]);
-            doc.addImage(leftImg, 'JPEG', 0, coverY, coverSize, coverSize);
+            doc.addPage([PAGE, PAGE]);
+            doc.addImage(rightImg, 'JPEG', 0, 0, PAGE, PAGE);
+            doc.addPage([PAGE, PAGE]);
+            doc.addImage(leftImg, 'JPEG', 0, 0, PAGE, PAGE);
           } else {
-            // LTR: left page first, then right page
-            doc.addPage([pageW, pageH]);
-            doc.addImage(leftImg, 'JPEG', 0, coverY, coverSize, coverSize);
-            doc.addPage([pageW, pageH]);
-            doc.addImage(rightImg, 'JPEG', 0, coverY, coverSize, coverSize);
+            doc.addPage([PAGE, PAGE]);
+            doc.addImage(leftImg, 'JPEG', 0, 0, PAGE, PAGE);
+            doc.addPage([PAGE, PAGE]);
+            doc.addImage(rightImg, 'JPEG', 0, 0, PAGE, PAGE);
           }
         }
 
-        // Last page: Back Cover - 1:1 image centered on portrait page
-        doc.addPage([pageW, pageH]);
+        // Last page: Back Cover — full square page
+        doc.addPage([PAGE, PAGE]);
         const backCoverImg = storyPlan.scenes[backCoverIndex].imageUrl!;
-        doc.addImage(backCoverImg, 'JPEG', 0, coverY, coverSize, coverSize);
+        doc.addImage(backCoverImg, 'JPEG', 0, 0, PAGE, PAGE);
 
         doc.save(`${userInput.name}-Magical-Book-32Pages.pdf`);
 
