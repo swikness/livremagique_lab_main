@@ -37,7 +37,8 @@ function getPronouns(
   language: string,
   gender: string
 ): { pronoun: string; pronounCap: string; pronounPossessive: string } {
-  const isFemale = (gender || '').toLowerCase().includes('female') || (gender || '').toLowerCase() === 'f';
+  const g = (gender || '').toLowerCase();
+  const isFemale = g.includes('female') || g === 'f' || g === 'femme';
   switch (language) {
     case 'French':
       return {
@@ -826,7 +827,8 @@ export function buildRamadanStoryPlan(input: UserInput): StoryPlan {
   const lang = getLang(input);
   const name = input.name?.trim() || 'Child';
   const nameToUse = lang === 'Arabic' ? nameForArabic(name) : name;
-  const isFemale = (input.gender || '').toLowerCase().includes('female') || (input.gender || '').toLowerCase() === 'f';
+  const genderLower = (input.gender || '').toLowerCase();
+  const isFemale = genderLower.includes('female') || genderLower === 'f' || genderLower === 'femme';
   const { pronoun, pronounCap, pronounPossessive } = getPronouns(
     input.language || 'French',
     input.gender || ''
