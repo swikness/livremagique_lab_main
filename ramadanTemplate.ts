@@ -61,6 +61,51 @@ function getPronouns(
   }
 }
 
+/** Returns true if the string contains Arabic script. */
+function hasArabicScript(s: string): boolean {
+  return /[\u0600-\u06FF]/.test(s || '');
+}
+
+/**
+ * Transliterate a Latin-script name to Arabic for display when language is Arabic.
+ * If the name already contains Arabic script, returns it as-is.
+ */
+function nameForArabic(latinName: string): string {
+  const n = (latinName || '').trim();
+  if (!n) return n;
+  if (hasArabicScript(n)) return n;
+
+  const one: Record<string, string> = {
+    a: 'ا', b: 'ب', t: 'ت', j: 'ج', h: 'ه', d: 'د', r: 'ر', z: 'ز', s: 'س', f: 'ف', q: 'ق',
+    k: 'ك', l: 'ل', m: 'م', n: 'ن', w: 'و', y: 'ي', e: 'ي', i: 'ي', o: 'و', u: 'و',
+    c: 'ك', p: 'ب', v: 'ف', g: 'غ', '\'': 'ع', ' ': ' ',
+  };
+  const digraphs: [string, string][] = [['th', 'ث'], ['sh', 'ش'], ['ch', 'ش'], ['gh', 'غ'], ['dh', 'ذ'], ['kh', 'خ']];
+
+  let out = '';
+  const lower = n.toLowerCase();
+  let i = 0;
+  while (i < lower.length) {
+    let found = false;
+    for (const [dig, ar] of digraphs) {
+      if (lower.slice(i, i + dig.length) === dig) {
+        out += ar;
+        i += dig.length;
+        found = true;
+        break;
+      }
+    }
+    if (found) continue;
+    const c = lower[i];
+    if (i === 0 && c === 'a') out += 'آ'; // alef with madda (e.g. Adam → آدم)
+    else if (i === 0 && (c === 'e' || c === 'i')) out += 'إ'; // alef with hamza below
+    else
+      out += one[c] ?? c;
+    i++;
+  }
+  return out || n;
+}
+
 function resolvePlaceholders(
   text: string,
   name: string,
@@ -649,12 +694,13 @@ function getLang(input: UserInput): Lang {
 export function buildRamadanStoryPlan(input: UserInput): StoryPlan {
   const lang = getLang(input);
   const name = input.name?.trim() || 'Child';
+  const nameToUse = lang === 'Arabic' ? nameForArabic(name) : name;
   const { pronoun, pronounCap, pronounPossessive } = getPronouns(
     input.language || 'French',
     input.gender || ''
   );
 
-  const resolve = (t: string) => resolvePlaceholders(t, name, pronoun, pronounCap, pronounPossessive);
+  const resolve = (t: string) => resolvePlaceholders(t, nameToUse, pronoun, pronounCap, pronounPossessive);
   const synopsis = resolve(SYNOPSIS[lang] || SYNOPSIS.French);
   const coverTitle = resolve(COVER_TITLE[lang] || COVER_TITLE.French);
 
