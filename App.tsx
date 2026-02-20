@@ -417,7 +417,10 @@ const App: React.FC = () => {
         sheetName?: string;
         row?: { prenoms?: string; ages?: string; langues?: string; themes?: string; child1PhotoBase64?: string; child2PhotoBase64?: string; child3PhotoBase64?: string };
       }) => {
-        const isRamadan = data.sessionType === 'ramadan' || urlTemplate === 'ramadan';
+        const isRamadan =
+          data.sessionType === 'ramadan' ||
+          urlTemplate === 'ramadan' ||
+          (data.theme && String(data.theme).includes('KIDS_RAMADAN'));
         if (isRamadan) {
           // Ramadan/kids flow: show Kids + Ramadan template and pre-fill from session (backend already mapped row → userInput)
           setUserInput({
