@@ -34,6 +34,8 @@ export interface SheetContext {
   webhookUrl: string;
   webhookSecret: string;
   buyerName: string;
+  /** e.g. 'kids_orders' for Ramadan cover flow so webhook updates the correct sheet tab */
+  sheetName?: string;
 }
 
 const TRANSLATIONS = {
@@ -386,12 +388,13 @@ const App: React.FC = () => {
     loadLogo();
   }, []);
 
-  // Load from-sheet session when URL has ?fromSheet=sessionId
+  // Load from-sheet session when URL has ?fromSheet=sessionId (and optionally ?template=ramadan)
   useEffect(() => {
     if (!BACKEND_URL) return;
     const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
     const sessionId = params.get('fromSheet');
     if (!sessionId) return;
+    const urlTemplate = params.get('template');
     setFromSheetLoading(true);
     setFromSheetError(null);
     fetch(`${BACKEND_URL.replace(/\/$/, '')}/sheet/session/${sessionId}`)
@@ -399,31 +402,64 @@ const App: React.FC = () => {
         if (!res.ok) throw new Error(res.status === 404 ? 'Session expired or not found' : `Error ${res.status}`);
         return res.json();
       })
-      .then((data: { userInput: UserInput & { loversStoryType?: string; customNote?: string }; theme: string; coverBase64: string | null; coverOnly?: boolean; outputFolderId: string; spreadsheetId: string; rowIndex: number; webhookUrl: string; webhookSecret: string; buyerName: string }) => {
-        setUserInput({ ...data.userInput, theme: data.theme });
+      .then((data: {
+        userInput: UserInput & { loversStoryType?: string; customNote?: string };
+        theme: string;
+        coverBase64: string | null;
+        coverOnly?: boolean;
+        outputFolderId: string;
+        spreadsheetId: string;
+        rowIndex: number;
+        webhookUrl: string;
+        webhookSecret: string;
+        buyerName: string;
+        sessionType?: string;
+        sheetName?: string;
+        row?: { prenoms?: string; ages?: string; langues?: string; themes?: string; child1PhotoBase64?: string; child2PhotoBase64?: string; child3PhotoBase64?: string };
+      }) => {
+        const isRamadan = data.sessionType === 'ramadan' || urlTemplate === 'ramadan';
+        if (isRamadan) {
+          // Ramadan/kids flow: show Kids + Ramadan template and pre-fill from session (backend already mapped row → userInput)
+          setUserInput({
+            ...data.userInput,
+            theme: data.theme,
+            audience: TargetAudience.KIDS,
+          });
+          setKidsStoryTemplate('RAMADAN');
+          setSheetContext({
+            outputFolderId: data.outputFolderId,
+            spreadsheetId: data.spreadsheetId,
+            rowIndex: data.rowIndex,
+            webhookUrl: data.webhookUrl || '',
+            webhookSecret: data.webhookSecret || '',
+            buyerName: data.buyerName || 'Livre',
+            sheetName: data.sheetName || 'kids_orders',
+          });
+        } else {
+          setUserInput({ ...data.userInput, theme: data.theme });
+          setSheetContext({
+            outputFolderId: data.outputFolderId,
+            spreadsheetId: data.spreadsheetId,
+            rowIndex: data.rowIndex,
+            webhookUrl: data.webhookUrl || '',
+            webhookSecret: data.webhookSecret || '',
+            buyerName: data.buyerName || 'Livre',
+          });
+          const storyType = data.userInput.loversStoryType
+            || (data.theme && data.theme.includes('CUSTOM_STORY') ? 'CUSTOM_STORY' : null)
+            || (data.theme && data.theme.includes('LOVE_STORY') ? 'LOVE_STORY' : null)
+            || (data.theme && data.theme.includes('BUCKET_LIST') ? 'BUCKET_LIST' : null)
+            || '10_REASONS';
+          setLoversStoryType(storyType as LoversStoryType);
+          setRecipientType((data.userInput.recipient === 'HIM' ? 'HIM' : 'HER') as RecipientType);
+          setSelectedYearsCount(data.userInput.yearsCount || '2');
+          setSelectedOptions(Array.isArray(data.userInput.selectedThemes) && data.userInput.selectedThemes.length > 0 ? data.userInput.selectedThemes : (storyType === '10_REASONS' ? ['Amour'] : []));
+          setCustomStoryTitle(data.userInput.customTitle || '');
+          setCustomStorySynopsis(data.userInput.customNote || '');
+        }
         setSheetCoverBase64(data.coverBase64 || null);
         setSheetCoverOnlyMode(!!data.coverOnly);
         if (data.coverOnly) setQuickCoverVisible(true);
-        setSheetContext({
-          outputFolderId: data.outputFolderId,
-          spreadsheetId: data.spreadsheetId,
-          rowIndex: data.rowIndex,
-          webhookUrl: data.webhookUrl || '',
-          webhookSecret: data.webhookSecret || '',
-          buyerName: data.buyerName || 'Livre',
-        });
-        // Pre-fill book title (story type), for him/her, years, and options from sheet
-        const storyType = data.userInput.loversStoryType
-          || (data.theme && data.theme.includes('CUSTOM_STORY') ? 'CUSTOM_STORY' : null)
-          || (data.theme && data.theme.includes('LOVE_STORY') ? 'LOVE_STORY' : null)
-          || (data.theme && data.theme.includes('BUCKET_LIST') ? 'BUCKET_LIST' : null)
-          || '10_REASONS';
-        setLoversStoryType(storyType as LoversStoryType);
-        setRecipientType((data.userInput.recipient === 'HIM' ? 'HIM' : 'HER') as RecipientType);
-        setSelectedYearsCount(data.userInput.yearsCount || '2');
-        setSelectedOptions(Array.isArray(data.userInput.selectedThemes) && data.userInput.selectedThemes.length > 0 ? data.userInput.selectedThemes : (storyType === '10_REASONS' ? ['Amour'] : []));
-        setCustomStoryTitle(data.userInput.customTitle || '');
-        setCustomStorySynopsis(data.userInput.customNote || '');
       })
       .catch((e: Error) => setFromSheetError(e.message || 'Failed to load session'))
       .finally(() => setFromSheetLoading(false));
@@ -1419,6 +1455,7 @@ const App: React.FC = () => {
       form.append('webhookUrl', sheetContext.webhookUrl);
       form.append('webhookSecret', sheetContext.webhookSecret);
       form.append('buyerName', sheetContext.buyerName);
+      if (sheetContext.sheetName) form.append('sheetName', sheetContext.sheetName);
       const base = BACKEND_URL.replace(/\/$/, '');
       const res = await fetch(`${base}/uploadPdf`, { method: 'POST', body: form });
       const data = await res.json().catch(() => ({}));
@@ -1449,6 +1486,7 @@ const App: React.FC = () => {
       form.append('webhookUrl', sheetContext.webhookUrl);
       form.append('webhookSecret', sheetContext.webhookSecret);
       form.append('buyerName', sheetContext.buyerName);
+      if (sheetContext.sheetName) form.append('sheetName', sheetContext.sheetName);
       const base = BACKEND_URL.replace(/\/$/, '');
       const r = await fetch(`${base}/uploadCover`, { method: 'POST', body: form });
       const data = await r.json().catch(() => ({}));

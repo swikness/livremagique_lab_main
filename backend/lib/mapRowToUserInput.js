@@ -88,3 +88,50 @@ export function mapRowToUserInput(row) {
 
   return { userInput, theme };
 }
+
+const langMapKids = {
+  'Français': 'French', 'French': 'French',
+  'Arabe': 'Arabic', 'Arabic': 'Arabic',
+  'Anglais': 'English', 'English': 'English',
+  'Espagnol': 'Spanish', 'Spanish': 'Spanish',
+};
+
+function normalizeStyleKids(s) {
+  const str = String(s || '').trim();
+  if (str.includes('3D') || str.toLowerCase().includes('3d')) return '3D Animation';
+  if (str.toLowerCase().includes('semi') || str.toLowerCase().includes('réaliste') || str.toLowerCase().includes('realistic')) return 'Semi-Realistic';
+  if (str.toLowerCase().includes('vector') || str.toLowerCase().includes('cartoon') || str.toLowerCase().includes('dessin')) return 'Vector Illustration';
+  return '3D Animation';
+}
+
+/**
+ * Map kids_orders (Ramadan) row to UserInput + theme for app pre-fill and cover flow.
+ * @param {object} row - row from GAS (prenoms, ages, langues, themes, child1PhotoBase64, ...)
+ * @returns {{ userInput: object, theme: string }}
+ */
+export function mapRamadanRowToUserInput(row) {
+  const prenoms = String(row.prenoms || '').trim();
+  const firstName = prenoms ? prenoms.split(/[,;]/)[0].trim() || 'Enfant' : 'Enfant';
+  const ages = String(row.ages ?? '').trim();
+  const firstAge = ages ? ages.split(/[,;]/)[0].trim() || '8' : '8';
+  const langues = String(row.langues || 'Français').trim();
+  const language = langMapKids[langues] || 'French';
+  const themes = String(row.themes || '').trim();
+  const selectedThemes = themes ? themes.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : ['Amour'];
+  const style = normalizeStyleKids(row.themes || row.style);
+  const theme = "Story Type: KIDS_RAMADAN. A heartwarming Ramadan story for a child. Same story structure for every child; only the child's name and gender (he/she) are personalized.";
+  const userInput = {
+    name: firstName,
+    age: firstAge,
+    gender: 'Male',
+    photoBase64: row.child1PhotoBase64 || undefined,
+    audience: 'Kids',
+    theme,
+    selectedThemes,
+    style,
+    extras: [],
+    language,
+    wordsPerScene: 15,
+  };
+  return { userInput, theme };
+}

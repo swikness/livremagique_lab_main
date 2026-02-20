@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import express from 'express';
 import multer from 'multer';
 import { google } from 'googleapis';
-import { mapRowToUserInput } from './lib/mapRowToUserInput.js';
+import { mapRowToUserInput, mapRamadanRowToUserInput } from './lib/mapRowToUserInput.js';
 import { generateStoryPlan, generateSceneImage } from './lib/gemini.js';
 import { uploadPdf, uploadImage } from './lib/drive.js';
 import { buildPdf } from './lib/pdf.js';
@@ -134,7 +134,7 @@ app.post('/sheet/prepare', (req, res) => {
 
 // --- Sheet-to-app: prepare cover-only session (no existing cover required) ---
 app.post('/sheet/prepareCover', (req, res) => {
-  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret } = req.body || {};
+  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, type, sheetName } = req.body || {};
   if (!row || !outputFolderId || !spreadsheetId || rowIndex == null) {
     return res.status(400).json({
       error: 'Missing required fields: row, outputFolderId, spreadsheetId, rowIndex',
@@ -144,21 +144,32 @@ app.post('/sheet/prepareCover', (req, res) => {
   if (safeRowIndex < 2) {
     return res.status(400).json({ error: 'rowIndex must be >= 2' });
   }
+  const isRamadan = type === 'ramadan';
   let userInput;
   let theme;
-  try {
-    const mapped = mapRowToUserInput(row);
-    userInput = mapped.userInput;
-    theme = mapped.theme;
-  } catch (e) {
-    return res.status(400).json({ error: 'Invalid row data: ' + e.message });
+  if (isRamadan) {
+    try {
+      const mapped = mapRamadanRowToUserInput(row);
+      userInput = mapped.userInput;
+      theme = mapped.theme;
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid Ramadan row data: ' + e.message });
+    }
+  } else {
+    try {
+      const mapped = mapRowToUserInput(row);
+      userInput = mapped.userInput;
+      theme = mapped.theme;
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid row data: ' + e.message });
+    }
   }
   purgeExpiredSessions();
   const sessionId = crypto.randomUUID();
-  const name1 = (row.partner1Name || 'Lui').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
-  const name2 = (row.partner2Name || 'Elle').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '');
-  const buyerName = (row.buyerName || `${name1}-${name2}`).replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Livre';
-  sheetSessions.set(sessionId, {
+  const effectiveSheetName = sheetName || (isRamadan ? 'kids_orders' : 'lovers_orders');
+  const buyerName = (row.buyerName || (isRamadan ? String(row.prenoms || 'Enfant').split(/[,;]/)[0].trim() || 'Livre' : 'Livre'))
+    .replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() || 'Livre';
+  const sessionPayload = {
     row,
     outputFolderId,
     spreadsheetId,
@@ -170,8 +181,11 @@ app.post('/sheet/prepareCover', (req, res) => {
     coverBase64: null,
     coverOnly: true,
     buyerName,
+    sessionType: isRamadan ? 'ramadan' : 'lovers',
+    sheetName: effectiveSheetName,
     createdAt: Date.now(),
-  });
+  };
+  sheetSessions.set(sessionId, sessionPayload);
   res.status(200).json({ sessionId });
 });
 
@@ -182,7 +196,7 @@ app.get('/sheet/session/:id', (req, res) => {
   if (!data) {
     return res.status(404).json({ error: 'Session not found or expired' });
   }
-  res.status(200).json({
+  const payload = {
     userInput: data.userInput,
     theme: data.theme,
     coverBase64: data.coverBase64,
@@ -193,7 +207,13 @@ app.get('/sheet/session/:id', (req, res) => {
     webhookUrl: data.webhookUrl,
     webhookSecret: data.webhookSecret,
     buyerName: data.buyerName,
-  });
+    sessionType: data.sessionType || 'lovers',
+    sheetName: data.sheetName || 'lovers_orders',
+  };
+  if (data.sessionType === 'ramadan' && data.row) {
+    payload.row = data.row;
+  }
+  res.status(200).json(payload);
 });
 
 app.post('/createBook', async (req, res) => {
@@ -314,7 +334,7 @@ app.post('/uploadPdf', upload.single('file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.status(400).json({ error: 'Missing PDF file' });
   }
-  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName } = req.body || {};
+  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName } = req.body || {};
   if (!folderId || !spreadsheetId || rowIndex == null) {
     return res.status(400).json({
       error: 'Missing required fields: folderId, spreadsheetId, rowIndex',
@@ -335,7 +355,7 @@ app.post('/uploadPdf', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Drive upload failed: ' + e.message });
   }
   try {
-    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, 'Généré', pdfUrl);
+    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, 'Généré', pdfUrl, null, sheetName);
   } catch (e) {
     console.warn('Webhook failed:', e.message);
   }
@@ -347,7 +367,7 @@ app.post('/uploadCover', upload.single('file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.status(400).json({ error: 'Missing cover image file' });
   }
-  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName } = req.body || {};
+  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName } = req.body || {};
   if (!folderId || !spreadsheetId || rowIndex == null) {
     return res.status(400).json({
       error: 'Missing required fields: folderId, spreadsheetId, rowIndex',
@@ -370,7 +390,7 @@ app.post('/uploadCover', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Drive upload failed: ' + e.message });
   }
   try {
-    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, null, null, coverUrl);
+    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, null, null, coverUrl, sheetName);
   } catch (e) {
     console.warn('Webhook (cover) failed:', e.message);
   }
