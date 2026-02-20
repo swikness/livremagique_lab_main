@@ -36,6 +36,8 @@ export interface SheetContext {
   buyerName: string;
   /** e.g. 'kids_orders' for Ramadan cover flow so webhook updates the correct sheet tab */
   sheetName?: string;
+  /** e.g. 15, 16, 17 for Couverture 1/2/3 so webhook writes to the right column */
+  coverColumn?: number;
 }
 
 const TRANSLATIONS = {
@@ -418,6 +420,7 @@ const App: React.FC = () => {
         buyerName: string;
         sessionType?: string;
         sheetName?: string;
+        coverColumn?: number;
         row?: { prenoms?: string; ages?: string; langues?: string; themes?: string; child1PhotoBase64?: string; child2PhotoBase64?: string; child3PhotoBase64?: string };
       }) => {
         const themeStr = data.theme ?? data.userInput?.theme ?? '';
@@ -442,6 +445,7 @@ const App: React.FC = () => {
             webhookSecret: data.webhookSecret || '',
             buyerName: data.buyerName || 'Livre',
             sheetName: data.sheetName || 'kids_orders',
+            coverColumn: data.coverColumn != null ? Number(data.coverColumn) : undefined,
           });
         } else {
           setUserInput({ ...data.userInput, theme: data.theme });
@@ -1509,6 +1513,7 @@ const App: React.FC = () => {
       form.append('webhookSecret', sheetContext.webhookSecret);
       form.append('buyerName', sheetContext.buyerName);
       if (sheetContext.sheetName) form.append('sheetName', sheetContext.sheetName);
+      if (sheetContext.coverColumn != null) form.append('coverColumn', String(sheetContext.coverColumn));
       const base = BACKEND_URL.replace(/\/$/, '');
       const r = await fetch(`${base}/uploadCover`, { method: 'POST', body: form });
       const data = await r.json().catch(() => ({}));

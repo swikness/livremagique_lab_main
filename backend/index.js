@@ -134,7 +134,7 @@ app.post('/sheet/prepare', (req, res) => {
 
 // --- Sheet-to-app: prepare cover-only session (no existing cover required) ---
 app.post('/sheet/prepareCover', (req, res) => {
-  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, type, sheetName } = req.body || {};
+  const { row, outputFolderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, type, sheetName, coverColumn } = req.body || {};
   if (!row || !outputFolderId || !spreadsheetId || rowIndex == null) {
     return res.status(400).json({
       error: 'Missing required fields: row, outputFolderId, spreadsheetId, rowIndex',
@@ -183,6 +183,7 @@ app.post('/sheet/prepareCover', (req, res) => {
     buyerName,
     sessionType: isRamadan ? 'ramadan' : 'lovers',
     sheetName: effectiveSheetName,
+    coverColumn: coverColumn != null ? parseInt(coverColumn, 10) : undefined,
     createdAt: Date.now(),
   };
   sheetSessions.set(sessionId, sessionPayload);
@@ -209,6 +210,7 @@ app.get('/sheet/session/:id', (req, res) => {
     buyerName: data.buyerName,
     sessionType: data.sessionType || 'lovers',
     sheetName: data.sheetName || 'lovers_orders',
+    coverColumn: data.coverColumn,
   };
   if (data.sessionType === 'ramadan' && data.row) {
     payload.row = data.row;
@@ -367,7 +369,7 @@ app.post('/uploadCover', upload.single('file'), async (req, res) => {
   if (!req.file || !req.file.buffer) {
     return res.status(400).json({ error: 'Missing cover image file' });
   }
-  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName } = req.body || {};
+  const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName, coverColumn } = req.body || {};
   if (!folderId || !spreadsheetId || rowIndex == null) {
     return res.status(400).json({
       error: 'Missing required fields: folderId, spreadsheetId, rowIndex',
@@ -389,8 +391,9 @@ app.post('/uploadCover', upload.single('file'), async (req, res) => {
     console.error('uploadImage (cover) error:', e);
     return res.status(500).json({ error: 'Drive upload failed: ' + e.message });
   }
+  const coverColNum = coverColumn != null && coverColumn !== '' ? parseInt(coverColumn, 10) : undefined;
   try {
-    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, null, null, coverUrl, sheetName);
+    await callWebhook(webhookUrl || '', webhookSecret || '', spreadsheetId, safeRowIndex, null, null, coverUrl, sheetName, coverColNum);
   } catch (e) {
     console.warn('Webhook (cover) failed:', e.message);
   }
