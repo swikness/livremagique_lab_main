@@ -388,10 +388,13 @@ const App: React.FC = () => {
     loadLogo();
   }, []);
 
+  // Capture initial URL search once so we don't lose params if the SPA or router changes the URL later
+  const initialSearchRef = useRef(typeof window !== 'undefined' ? window.location.search : '');
+
   // Load from-sheet session when URL has ?fromSheet=sessionId (and optionally ?template=ramadan)
   useEffect(() => {
     if (!BACKEND_URL) return;
-    const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const params = new URLSearchParams(initialSearchRef.current);
     const sessionId = params.get('fromSheet');
     if (!sessionId) return;
     const urlTemplate = params.get('template');
@@ -403,7 +406,7 @@ const App: React.FC = () => {
         return res.json();
       })
       .then((data: {
-        userInput: UserInput & { loversStoryType?: string; customNote?: string };
+        userInput: UserInput & { loversStoryType?: string; customNote?: string; audience?: string };
         theme: string;
         coverBase64: string | null;
         coverOnly?: boolean;
@@ -417,10 +420,12 @@ const App: React.FC = () => {
         sheetName?: string;
         row?: { prenoms?: string; ages?: string; langues?: string; themes?: string; child1PhotoBase64?: string; child2PhotoBase64?: string; child3PhotoBase64?: string };
       }) => {
+        const themeStr = data.theme ?? data.userInput?.theme ?? '';
         const isRamadan =
           data.sessionType === 'ramadan' ||
           urlTemplate === 'ramadan' ||
-          (data.theme && String(data.theme).includes('KIDS_RAMADAN'));
+          (themeStr && String(themeStr).includes('KIDS_RAMADAN')) ||
+          (data.userInput?.audience === 'Kids' && themeStr && String(themeStr).includes('KIDS_RAMADAN'));
         if (isRamadan) {
           // Ramadan/kids flow: show Kids + Ramadan template and pre-fill from session (backend already mapped row → userInput)
           setUserInput({
@@ -467,6 +472,20 @@ const App: React.FC = () => {
       .catch((e: Error) => setFromSheetError(e.message || 'Failed to load session'))
       .finally(() => setFromSheetLoading(false));
   }, []);
+
+  // Safeguard: when we're in sheet cover-only mode with Kids audience and Ramadan theme, ensure Ramadan template is selected (fixes cases where URL/backend didn't set it)
+  useEffect(() => {
+    if (
+      sheetContext &&
+      sheetCoverOnlyMode &&
+      userInput.audience === TargetAudience.KIDS &&
+      userInput.theme &&
+      String(userInput.theme).includes('KIDS_RAMADAN') &&
+      kidsStoryTemplate !== 'RAMADAN'
+    ) {
+      setKidsStoryTemplate('RAMADAN');
+    }
+  }, [sheetContext, sheetCoverOnlyMode, userInput.audience, userInput.theme, kidsStoryTemplate]);
 
   // New state for Photo Quality and Control
   const [photoQuality, setPhotoQuality] = useState<{ score: number; feedback: string } | null>(null);
