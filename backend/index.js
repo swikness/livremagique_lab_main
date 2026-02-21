@@ -6,6 +6,23 @@ import express from 'express';
 import { mapRowToUserInput, mapRamadanRowToUserInput } from './lib/mapRowToUserInput.js';
 
 const app = express();
+
+// CORS: allow frontend (Vercel, localhost) to call this backend
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50mb' })); // row can contain base64 images
 
 const PORT = Number(process.env.PORT) || 8080;
