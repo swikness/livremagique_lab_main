@@ -1,14 +1,16 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Cropper from 'react-easy-crop';
-import { jsPDF } from 'jspdf';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { AppStep, UserInput, StoryStyle, TargetAudience, StoryPlan, Scene, ExtraAsset, KidsStoryTemplate } from './types';
-import { generateStoryPlan, generateSceneImage, analyzeImage, describeAsset, editSceneImage, analyzePhotoQuality, validateBookSpread, generateCoverPlan } from './geminiService';
-import { buildRamadanStoryPlan, RAMADAN_INNER_SCENES } from './ramadanTemplate';
+import { loadGemini, loadRamadan } from './lazyServices';
+
+// Lazy-load to avoid "Cannot access 'X' before initialization" at app startup
+const Cropper = lazy(() => import('react-easy-crop').then(m => ({ default: m.default })));
 
 const LOGO_PATH = '/logo.png';
 /** App-only: allowed inner scene counts (default 15). */
 const SCENE_COUNT_OPTIONS = [10, 12, 15, 18, 30];
+/** Ramadan story has 15 inner pages (matches ramadanTemplate). Kept local to avoid init-order issues. */
+const RAMADAN_PAGES_COUNT = 15;
 
 const THEME_OPTIONS = [
   "Amour", "Amitié", "Courage", "Environnement", "Mystère",
@@ -110,7 +112,7 @@ const TRANSLATIONS = {
     storyTemplate: "Modèle d'histoire",
     ramadanTitle: (name: string, _gender: string) => `${name || '[Nom]'} et les Valeurs du Ramadan`,
     numberOfScenes: "Nombre de scènes",
-    ramadanPagesNote: `${RAMADAN_INNER_SCENES} scènes (histoire fixe)`,
+    ramadanPagesNote: `${RAMADAN_PAGES_COUNT} scènes (histoire fixe)`,
     customStory: "Histoire personnalisée",
   },
   English: {
@@ -183,7 +185,7 @@ const TRANSLATIONS = {
     storyTemplate: "Story Template",
     ramadanTitle: (name: string, _gender: string) => `${name || '[Name]'} and the Values of Ramadan`,
     numberOfScenes: "Number of scenes",
-    ramadanPagesNote: `${RAMADAN_INNER_SCENES} story pages (fixed story)`,
+    ramadanPagesNote: `${RAMADAN_PAGES_COUNT} story pages (fixed story)`,
     customStory: "Custom story",
   }
 };
@@ -373,6 +375,13 @@ const App: React.FC = () => {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
 
+  // Sheet-to-app (from-sheet) state — must be declared before any useEffect that uses sheetContext
+  const [sheetContext, setSheetContext] = useState<SheetContext | null>(null);
+  const [sheetCoverBase64, setSheetCoverBase64] = useState<string | null>(null);
+  const [sheetCoverOnlyMode, setSheetCoverOnlyMode] = useState(false);
+  const [fromSheetLoading, setFromSheetLoading] = useState(false);
+  const [fromSheetError, setFromSheetError] = useState<string | null>(null);
+
   // Load Logo
   useEffect(() => {
     const loadLogo = async () => {
@@ -506,13 +515,6 @@ const App: React.FC = () => {
   const [quickCoverStyle, setQuickCoverStyle] = useState<StoryStyle>(StoryStyle.ANIMATION_3D);
   const [quickCoverCustomInstructions, setQuickCoverCustomInstructions] = useState<string>('');
   const [quickCoverLoading, setQuickCoverLoading] = useState(false);
-
-  // Sheet-to-app (from-sheet) state
-  const [sheetContext, setSheetContext] = useState<SheetContext | null>(null);
-  const [sheetCoverBase64, setSheetCoverBase64] = useState<string | null>(null);
-  const [sheetCoverOnlyMode, setSheetCoverOnlyMode] = useState(false);
-  const [fromSheetLoading, setFromSheetLoading] = useState(false);
-  const [fromSheetError, setFromSheetError] = useState<string | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -773,6 +775,7 @@ const App: React.FC = () => {
 
       // Analyze Quality
       try {
+        const { analyzePhotoQuality } = await loadGemini();
         const quality = await analyzePhotoQuality(base64);
         if (target === 'reference') {
           setPhotoQuality(quality);
@@ -967,10 +970,11 @@ const App: React.FC = () => {
         kidsStoryTemplate: userInput.audience === TargetAudience.KIDS ? kidsStoryTemplate ?? undefined : undefined,
         sceneCount: userInput.sceneCount ?? 15
       };
+      const gemini = await loadGemini();
       const plan =
         userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN'
-          ? buildRamadanStoryPlan(payload)
-          : await generateStoryPlan(payload);
+          ? (await loadRamadan()).buildRamadanStoryPlan(payload)
+          : await gemini.generateStoryPlan(payload);
       setStoryPlan(plan);
       setStep(AppStep.CREATION);
     } catch (error: any) {
@@ -987,7 +991,8 @@ const App: React.FC = () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const plan = await generateStoryPlan(userInput);
+      const gemini = await loadGemini();
+      const plan = await gemini.generateStoryPlan(userInput);
       plan.scenes[0].imageUrl = sheetCoverBase64;
       plan.scenes[0].status = 'done';
       setStoryPlan(plan);
@@ -1004,7 +1009,7 @@ const App: React.FC = () => {
         try {
           scene.status = 'loading';
           setStoryPlan({ ...plan, scenes: [...newScenes] });
-          const rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+          const rawImage = await gemini.generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
           scene.imageUrl = rawImage;
           addToHistory(scene, rawImage);
           scene.status = 'done';
@@ -1052,12 +1057,14 @@ const App: React.FC = () => {
 
     setQuickCoverLoading(true);
     try {
+      const gemini = await loadGemini();
       const isRamadanKids = userInput.audience === TargetAudience.KIDS && kidsStoryTemplate === 'RAMADAN';
       let coverScene: Scene;
 
       if (isRamadanKids) {
         // Use the exact Ramadan front cover from the template so Quick Cover aligns with the story
-        const ramadanPlan = buildRamadanStoryPlan(userInput);
+        const ramadan = await loadRamadan();
+        const ramadanPlan = ramadan.buildRamadanStoryPlan(userInput);
         coverScene = ramadanPlan.scenes[0];
       } else {
         // Determine effective theme based on audience
@@ -1074,7 +1081,7 @@ const App: React.FC = () => {
           }
         }
 
-        coverScene = await generateCoverPlan({
+        coverScene = await gemini.generateCoverPlan({
           ...userInput,
           theme: effectiveTheme,
           style: quickCoverStyle,
@@ -1083,7 +1090,7 @@ const App: React.FC = () => {
       }
 
       // Generate Image using same logic as main story
-      const img = await generateSceneImage(
+      const img = await gemini.generateSceneImage(
         coverScene,
         quickCoverStyle,
         userInput.photoBase64,
@@ -1234,7 +1241,7 @@ const App: React.FC = () => {
     setStoryPlan({ ...storyPlan, scenes: newScenes }); // Show loading
 
     try {
-      // Use editSceneImage from geminiService
+      const { editSceneImage } = await loadGemini();
       const newImage = await editSceneImage(scene, instruction, userInput.photoBase64, userInput.partnerPhotoBase64);
       addToHistory(scene, newImage);
       scene.status = 'done';
@@ -1264,8 +1271,9 @@ const App: React.FC = () => {
 
     console.log(`Verifying Scene ${index}...`);
     try {
+      const gemini = await loadGemini();
       // 1. Validate
-      const validation = await validateBookSpread(scene.imageUrl);
+      const validation = await gemini.validateBookSpread(scene.imageUrl);
 
       if (validation.isValid) {
         console.log(`Scene ${index} is valid.`);
@@ -1281,7 +1289,7 @@ const App: React.FC = () => {
       // Temporary object to generate with new prompt
       const tempScene = { ...scene, prompt: retryPrompt };
 
-      const newImage = await generateSceneImage(
+      const newImage = await gemini.generateSceneImage(
         tempScene,
         userInput.style,
         userInput.photoBase64,
@@ -1337,11 +1345,12 @@ const App: React.FC = () => {
 
       for (let i = 0; i < newScenes.length; i += 3) {
         const batch = [i, i + 1, i + 2].filter(idx => idx < newScenes.length);
+        const gemini = await loadGemini();
         await Promise.all(batch.map(async (idx) => {
           const scene = newScenes[idx];
           const isCover = idx === 0 || idx === backCoverIndex;
           try {
-            const rawImage = await generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
+            const rawImage = await gemini.generateSceneImage(scene, userInput.style, userInput.photoBase64, userInput.partnerPhotoBase64, isCover ? (logoBase64 || undefined) : undefined);
             newScenes[idx].imageUrl = rawImage;
             addToHistory(newScenes[idx], rawImage);
             newScenes[idx].status = 'done';
@@ -1404,6 +1413,7 @@ const App: React.FC = () => {
 
   const buildSquarePdfForDrive = async (): Promise<Blob> => {
     if (!storyPlan || storyPlan.scenes.length < innerCount + 2) throw new Error(`Plan must have ${innerCount + 2} scenes`);
+    const { jsPDF } = await import('jspdf');
     const PAGE = 576;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE, PAGE] });
     const isRTL = userInput.language === 'Arabic';
@@ -1538,6 +1548,7 @@ const App: React.FC = () => {
     scene.status = 'loading';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
+      const { generateSceneImage } = await loadGemini();
       const isCover = index === 0 || index === 16;
 
       // For scenes, we generate 16:9 and keeping it.
@@ -1575,6 +1586,7 @@ const App: React.FC = () => {
     scene.status = 'loading';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
+      const { generateSceneImage } = await loadGemini();
       const isCover = index === 0 || index === 16;
       let rawImage = await generateSceneImage(
         scene,
@@ -1610,6 +1622,7 @@ const App: React.FC = () => {
     scene.status = 'loading';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
+      const { editSceneImage } = await loadGemini();
       const img = await editSceneImage(scene, scene.editInstruction!, userInput.photoBase64, userInput.partnerPhotoBase64);
       scene.imageUrl = img;
       scene.status = 'done';
@@ -1630,6 +1643,7 @@ const App: React.FC = () => {
     scene.status = 'loading';
     setStoryPlan({ ...storyPlan, scenes: newScenes });
     try {
+      const { analyzeImage } = await loadGemini();
       const analysis = await analyzeImage(scene.imageUrl!, scene.prompt);
       scene.correctionAnalysis = analysis;
     } catch (err) {
@@ -1777,6 +1791,7 @@ const App: React.FC = () => {
         }
 
         // Square pages for individual pages (covers & split halves) — all pages same square size
+        const { jsPDF } = await import('jspdf');
         const PAGE = 576;
         const doc = new jsPDF({ orientation: 'portrait', unit: 'px', format: [PAGE, PAGE] });
 
@@ -1811,6 +1826,7 @@ const App: React.FC = () => {
 
       } else {
         // ===== 16-PAGE FORMAT: Spreads (original behavior) =====
+        const { jsPDF } = await import('jspdf');
         const doc = new jsPDF({
           orientation: 'landscape',
           unit: 'px',
@@ -1912,15 +1928,17 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="relative h-[500px] bg-black">
-              <Cropper
-                image={imageToCrop}
-                crop={crop}
-                zoom={zoom}
-                aspect={cropTarget === 'scene' ? 2 : 1}
-                onCropChange={setCrop}
-                onCropComplete={onCropComplete}
-                onZoomChange={setZoom}
-              />
+              <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400"><i className="fas fa-spinner animate-spin text-2xl" /></div>}>
+                <Cropper
+                  image={imageToCrop}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={cropTarget === 'scene' ? 2 : 1}
+                  onCropChange={setCrop}
+                  onCropComplete={onCropComplete}
+                  onZoomChange={setZoom}
+                />
+              </Suspense>
             </div>
             <div className="p-6 flex flex-col md:flex-row justify-between items-center bg-slate-900 gap-4">
               <div className="flex-1 w-full flex items-center gap-4">

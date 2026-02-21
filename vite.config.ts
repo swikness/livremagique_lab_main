@@ -20,6 +20,22 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
-    }
+    },
+    build: {
+      // Disable minification so "Cannot access 'X' before initialization" shows the real variable name.
+      minify: false,
+      rollupOptions: {
+        output: {
+          // Do NOT inline dynamic imports: keep lazy-loaded modules in separate chunks so they don't run at startup.
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) return undefined; // keep React in entry
+              return 'vendor';
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 2000,
+    },
   };
 });
