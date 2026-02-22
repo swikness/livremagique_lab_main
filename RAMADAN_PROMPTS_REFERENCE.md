@@ -111,16 +111,16 @@ In the middle of the day {{name}} sometimes feels thirsty or hungry. That's part
 
 ---
 
-## Scene 6 – Quiet moment
+## Scene 6 – Prayer (Salat)
 
 **Full prompt:** Character on LEFT. Scene description:
 ```
-Scene: A child in a reading nook or on a window seat, soft light, peaceful and reflective pose. Calm mood. Only the child in frame.
+Scene: A child standing or kneeling on a small prayer mat in a softly lit bedroom or living room at sunset. Warm golden light enters through the window. Calm, focused and peaceful expression. The atmosphere should feel serene, gentle and safe.
 ```
 
 **Text on image:**
 ```
-Sometimes {{name}} sits quietly to think. During Ramadan we take time to say thank you and to think about what matters. {{pronounCap}} closes {{pronounPossessive}} eyes and feels peace in {{pronounPossessive}} heart. {{name}} learned that these quiet moments help keep the heart light.
+During Ramadan, {{name}} also learns to pray. Prayer is a special moment to speak to Allah with the heart. {{pronounCap}} feels calm and focused. {{name}} learned that prayer helps keep the heart peaceful and strong.
 ```
 
 ---
@@ -153,16 +153,16 @@ During Ramadan evenings, {{name}} loves quiet moments at home. Sometimes we read
 
 ---
 
-## Scene 9 – Reading and learning
+## Scene 9 – The Quran
 
-**Full prompt:** Character on LEFT. Scene description:
+**Full prompt:** Character on RIGHT. Scene description:
 ```
-Scene: A child at a small desk or in a library corner with books, curious and focused. Learning mood. Only the child in frame.
+Scene: A child sitting respectfully at a small table with an open Quran in front of them. Soft warm evening light. Calm, attentive and curious expression. The atmosphere should feel peaceful and reflective.
 ```
 
 **Text on image:**
 ```
-{{name}} loves to read and learn during Ramadan. Stories, kind words, things about this special month. {{pronounCap}} asks questions and grows by understanding more. {{name}} learned that wanting to understand is a beautiful value.
+During Ramadan, {{name}} listens to and reads from the Quran. The Quran is a book that guides us to be kind and fair. {{pronounCap}} learns that its words help the heart grow wiser and gentler.
 ```
 
 ---
@@ -181,16 +181,16 @@ During Ramadan, {{name}} learns to give. Giving a little of what we have, or our
 
 ---
 
-## Scene 11 – Sharing with others
+## Scene 11 – Forgiveness
 
 **Full prompt:** Character on LEFT. Scene description:
 ```
-Scene: A child on a garden path or front step with a bag or basket to give. Kind, generous expression. Only the child in frame.
+Scene: A child sitting quietly in a softly lit room, thoughtful expression, hands gently together or holding a small note. Reflective and sincere mood.
 ```
 
 **Text on image:**
 ```
-{{name}} prepared a small gift for someone. Giving, even a little, makes the heart light. {{pronounCap}} knows that sadaqa can be a smile, a kind gesture or a thoughtfulness, not only money. {{name}} learned that kindness is a treasure.
+During Ramadan, {{name}} remembers that everyone makes mistakes. {{pronounCap}} says "I'm sorry" with sincerity and forgives others too. {{name}} learned that forgiveness makes the heart lighter and brings people closer together.
 ```
 
 ---
@@ -223,16 +223,16 @@ We're halfway through Ramadan! {{name}} is proud of {{pronounPossessive}} effort
 
 ---
 
-## Scene 14 – Last days / Laylat al-Qadr
+## Scene 14 – Laylat Al-Qadr (enhanced)
 
-**Full prompt:** Character on LEFT. Scene description:
+**Full prompt:** Character on RIGHT. Uncluttered night sky on LEFT for text (stars, moonlight, soft gradient). Scene description:
 ```
-Scene: A child by a window or in a quiet spot at night, stars visible, gentle and hopeful. Last days of Ramadan. Only the child in frame.
+Scene: A child standing by a window or on a balcony at night, looking at a star-filled sky. Soft moonlight illuminates the face. Hands gently raised in prayer. Peaceful and hopeful mood.
 ```
 
 **Text on image:**
 ```
-We are in the last days of Ramadan. {{name}} has heard about the Night of Power, such a precious night. {{pronounCap}} keeps hope and gratitude in {{pronounPossessive}} heart. {{name}} learned that believing in these special moments fills the heart with light.
+These are the last nights of Ramadan. {{name}} has heard about Laylat Al-Qadr, a night better than a thousand months. {{pronounCap}} makes a quiet prayer for family and for the world. {{name}} learned that some nights are filled with special light and blessings.
 ```
 
 ---
@@ -260,5 +260,5 @@ Design a clean, elegant Back Cover. COMPOSITION: TOP AREA: Uncluttered backgroun
 
 **Text on image:** The full synopsis, e.g. (English):
 ```
-{{name}} lives Ramadan from start to Eid: a sincere intention, the moon and the calendar, first suhoor and iftar, patience and gratitude, quiet moments of reflection, helping and family time, reading and learning, giving and sadaqa, peaceful evenings, the halfway point, the last days and the Night of Power, then the joy of Eid. A heartwarming story where {{pronoun}} discovers the values of this month with an open heart.
+{{name}} lives Ramadan from start to Eid: a sincere intention, the moon and the calendar, first suhoor and iftar, patience and gratitude, prayer, helping and family time, the Quran, giving and sadaqa, forgiveness, peaceful evenings, the halfway point, the last days and Laylat Al-Qadr, then the joy of Eid. A heartwarming story where {{pronoun}} discovers the values of this month with an open heart.
 ```

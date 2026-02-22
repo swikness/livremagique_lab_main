@@ -130,18 +130,18 @@ function resolvePlaceholders(
 /** Synopsis template per language (chronological 15-scene journey). Arabic has male/female for verb agreement. */
 const SYNOPSIS: Record<Exclude<Lang, 'Arabic'>, string> = {
   French:
-    "{{name}} vit le Ramadan du début à l'Eid : une intention sincère, la lune et le calendrier, le premier suhoor et iftar, la patience et la gratitude, des moments de calme, l'entraide et les moments en famille, la lecture et l'apprentissage, le don et la sadaqa, les soirées, la mi-parcours, les derniers jours et la Nuit du Destin, puis la joie de l'Eid. Une histoire bienveillante où {{pronoun}} découvre les valeurs de ce mois avec le cœur.",
+    "{{name}} vit le Ramadan du début à l'Eid : une intention sincère, la lune et le calendrier, le premier suhoor et iftar, la patience et la gratitude, la prière, l'entraide et les moments en famille, le Coran, le don et la sadaqa, le pardon, les soirées, la mi-parcours, Laylat Al-Qadr et les derniers jours, puis la joie de l'Eid. Une histoire bienveillante où {{pronoun}} découvre les valeurs de ce mois avec le cœur.",
   English:
-    "{{name}} lives Ramadan from start to Eid: a sincere intention, the moon and the calendar, first suhoor and iftar, patience and gratitude, quiet moments of reflection, helping and family time, reading and learning, giving and sadaqa, peaceful evenings, the halfway point, the last days and the Night of Power, then the joy of Eid. A heartwarming story where {{pronoun}} discovers the values of this month with an open heart.",
+    "{{name}} lives Ramadan from start to Eid: a sincere intention, the moon and the calendar, first suhoor and iftar, patience and gratitude, prayer, helping and family time, the Quran, giving and sadaqa, forgiveness, peaceful evenings, the halfway point, the last days and Laylat Al-Qadr, then the joy of Eid. A heartwarming story where {{pronoun}} discovers the values of this month with an open heart.",
   Spanish:
-    "{{name}} vive el Ramadán del inicio al Eid: una intención sincera, la luna y el calendario, el primer suhur e iftar, la paciencia y la gratitud, momentos de calma y reflexión, ayuda y momentos en familia, lectura y aprendizaje, dar y sadaqa, noches tranquilas, la mitad del camino, los últimos días y la Noche del Destino, y luego la alegría del Eid. Una historia entrañable donde {{pronoun}} descubre los valores de este mes con el corazón abierto.",
+    "{{name}} vive el Ramadán del inicio al Eid: una intención sincera, la luna y el calendario, el primer suhur e iftar, la paciencia y la gratitud, la oración, ayuda y momentos en familia, el Corán, dar y sadaqa, el perdón, noches tranquilas, la mitad del camino, los últimos días y Laylat Al-Qadr, y luego la alegría del Eid. Una historia entrañable donde {{pronoun}} descubre los valores de este mes con el corazón abierto.",
 };
 
 const SYNOPSIS_ARABIC: { male: string; female: string } = {
   male:
-    "{{name}} يعيش رمضان من البداية إلى العيد: نية صادقة والقمر والتقويم وأول سحور وإفطار والصبر والشكر ولحظات الهدوء والمساعدة ولحظات العائلة والقراءة والتعلم والعطاء والصدقة والليالي الهادئة ومنتصف الطريق والأيام الأخيرة وليلة القدر ثم فرح العيد. قصة دافئة يكتشف فيها {{pronoun}} قيم هذا الشهر بقلب مفتوح.",
+    "{{name}} يعيش رمضان من البداية إلى العيد: نية صادقة والقمر والتقويم وأول سحور وإفطار والصبر والشكر والصلاة والمساعدة ولحظات العائلة والقرآن والعطاء والصدقة والمغفرة والليالي الهادئة ومنتصف الطريق والأيام الأخيرة وليلة القدر ثم فرح العيد. قصة دافئة يكتشف فيها {{pronoun}} قيم هذا الشهر بقلب مفتوح.",
   female:
-    "{{name}} تعيش رمضان من البداية إلى العيد: نية صادقة والقمر والتقويم وأول سحور وإفطار والصبر والشكر ولحظات الهدوء والمساعدة ولحظات العائلة والقراءة والتعلم والعطاء والصدقة والليالي الهادئة ومنتصف الطريق والأيام الأخيرة وليلة القدر ثم فرح العيد. قصة دافئة تكتشف فيها {{pronoun}} قيم هذا الشهر بقلب مفتوح.",
+    "{{name}} تعيش رمضان من البداية إلى العيد: نية صادقة والقمر والتقويم وأول سحور وإفطار والصبر والشكر والصلاة والمساعدة ولحظات العائلة والقرآن والعطاء والصدقة والمغفرة والليالي الهادئة ومنتصف الطريق والأيام الأخيرة وليلة القدر ثم فرح العيد. قصة دافئة تكتشف فيها {{pronoun}} قيم هذا الشهر بقلب مفتوح.",
 };
 
 /** Front cover title per language ({{name}} = child's name) */
@@ -182,15 +182,15 @@ TEXT: {{STORY_TEXT}}`;
  * 3: Gratitude (shukr) — kitchen or dining nook at dawn, suhoor
  * 4: Gratitude at iftar — dining area at dusk, table set for iftar
  * 5: Patience (sabr) — garden, park bench, or sunny backyard
- * 6: Remembrance / calm — reading nook or window seat, soft light
+ * 6: Prayer (Salat) — prayer mat, bedroom/living room at sunset
  * 7: Kindness / helping — kitchen or hallway, setting table
  * 8: Family / togetherness — living room with cushions, evening
- * 9: Learning — small desk or library corner with books
+ * 9: The Quran — small table with open Quran, warm evening light
  * 10: Sadaqa (giving) — porch or doorstep with basket
- * 11: Sadaqa (smile/kindness) — garden path or front step with bag
+ * 11: Forgiveness — softly lit room, thoughtful, hands together or note
  * 12: Evening gratitude — balcony or window, evening lights
  * 13: Perseverance — sunny bedroom or window seat, mid-month
- * 14: Laylat al-Qadr / hope — window at night, stars
+ * 14: Laylat Al-Qadr — window/balcony at night, star-filled sky, hands in prayer
  * 15: Eid joy — front step or yard, morning light, festive clothes
  */
 const RAMADAN_SCENES: RamadanSceneTemplate[] = [
@@ -399,44 +399,44 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
       },
     },
   },
-  // 6: Quiet moment (remembrance / calm)
+  // 6: Prayer (Salat) — replaced "Quiet moment"
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child in a reading nook or on a window seat, soft light, peaceful and reflective pose. Calm mood. Only the child in frame.',
+      'Scene: A child standing or kneeling on a small prayer mat in a softly lit bedroom or living room at sunset. Warm golden light enters through the window. Calm, focused and peaceful expression. The atmosphere should feel serene, gentle and safe.',
       'LEFT'
     ),
     content: {
       French: {
-        title: 'Un moment de calme',
-        description: '{{name}} se recueille',
+        title: 'La prière (Salat)',
+        description: '{{name}} prie',
         storyText:
-          "Parfois {{name}} s'assoit au calme pour réfléchir. Pendant le Ramadan, on prend le temps de dire merci et de penser à ce qui compte. {{pronounCap}} ferme les yeux et sent la paix dans son cœur. {{name}} a appris que ces moments de calme aident à garder le cœur léger.",
+          "Pendant le Ramadan, {{name}} apprend aussi à prier. La prière est un moment spécial pour parler à Allah avec le cœur. {{pronounCap}} se sent calme et concentré. {{name}} a appris que la prière aide à garder le cœur en paix et fort.",
       },
       English: {
-        title: 'A quiet moment',
-        description: '{{name}} reflects',
+        title: 'Prayer (Salat)',
+        description: '{{name}} prays',
         storyText:
-          "Sometimes {{name}} sits quietly to think. During Ramadan we take time to say thank you and to think about what matters. {{pronounCap}} closes {{pronounPossessive}} eyes and feels peace in {{pronounPossessive}} heart. {{name}} learned that these quiet moments help keep the heart light.",
+          "During Ramadan, {{name}} also learns to pray. Prayer is a special moment to speak to Allah with the heart. {{pronounCap}} feels calm and focused. {{name}} learned that prayer helps keep the heart peaceful and strong.",
       },
       Arabic: {
         male: {
-          title: 'لحظة هدوء',
-          description: '{{name}} يتأمل',
+          title: 'الصلاة',
+          description: '{{name}} يصلي',
           storyText:
-            "أحياناً يجلس {{name}} بهدوء ليفكر. في رمضان نأخذ وقتاً لنشكر ونتأمل ما يهم. {{pronounCap}} يغلق عينيه ويشعر بالسلام في قلبه. تعلم {{name}} أن لحظات الهدوء هذه تساعد القلب أن يبقى خفيفاً.",
+            "في رمضان يتعلم {{name}} أيضاً الصلاة. الصلاة لحظة خاصة للتحدث إلى الله بالقلب. {{pronounCap}} يشعر بالهدوء والتركيز. تعلم {{name}} أن الصلاة تساعد القلب أن يبقى مطمئناً وقوياً.",
         },
         female: {
-          title: 'لحظة هدوء',
-          description: '{{name}} تتأمل',
+          title: 'الصلاة',
+          description: '{{name}} تصلي',
           storyText:
-            "أحياناً تجلس {{name}} بهدوء لتفكر. في رمضان نأخذ وقتاً لنشكر ونتأمل ما يهم. {{pronounCap}} تغلق عينيها وتشعر بالسلام في قلبها. تعلمت {{name}} أن لحظات الهدوء هذه تساعد القلب أن يبقى خفيفاً.",
+            "في رمضان تتعلم {{name}} أيضاً الصلاة. الصلاة لحظة خاصة للتحدث إلى الله بالقلب. {{pronounCap}} تشعر بالهدوء والتركيز. تعلمت {{name}} أن الصلاة تساعد القلب أن يبقى مطمئناً وقوياً.",
         },
       },
       Spanish: {
-        title: 'Un momento de calma',
-        description: '{{name}} reflexiona',
+        title: 'La oración (Salat)',
+        description: '{{name}} reza',
         storyText:
-          "A veces {{name}} se sienta en silencio para pensar. Durante el Ramadán dedicamos tiempo a dar las gracias y a pensar en lo que importa. {{pronounCap}} cierra los ojos y siente paz en su corazón. {{name}} aprendió que estos momentos de calma ayudan a mantener el corazón ligero.",
+          "Durante el Ramadán, {{name}} también aprende a rezar. La oración es un momento especial para hablar con Allah con el corazón. {{pronounCap}} se siente tranquilo y concentrado. {{name}} aprendió que la oración ayuda a mantener el corazón en paz y fuerte.",
       },
     },
   },
@@ -522,44 +522,44 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
       },
     },
   },
-  // 9: Reading and learning (curiosity, growing)
+  // 9: The Quran — replaced "Reading and learning"
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child at a small desk or in a library corner with books, curious and focused. Learning mood. Only the child in frame.',
-      'LEFT'
+      'Scene: A child sitting respectfully at a small table with an open Quran in front of them. Soft warm evening light. Calm, attentive and curious expression. The atmosphere should feel peaceful and reflective.',
+      'RIGHT'
     ),
     content: {
       French: {
-        title: 'Lire et apprendre',
-        description: '{{name}} découvre',
+        title: 'Le Coran',
+        description: '{{name}} et le Coran',
         storyText:
-          "{{name}} aime lire et apprendre pendant le Ramadan. Des histoires, des mots doux, des choses sur ce mois si spécial. {{pronounCap}} pose des questions et grandit en comprenant mieux. {{name}} a appris que chercher à comprendre est une belle valeur.",
+          "Pendant le Ramadan, {{name}} écoute et lit le Coran. Le Coran est un livre qui nous guide à être bons et justes. {{pronounCap}} apprend que ses paroles aident le cœur à devenir plus sage et plus doux.",
       },
       English: {
-        title: 'Reading and learning',
-        description: '{{name}} discovers',
+        title: 'The Quran',
+        description: '{{name}} and the Quran',
         storyText:
-          "{{name}} loves to read and learn during Ramadan. Stories, kind words, things about this special month. {{pronounCap}} asks questions and grows by understanding more. {{name}} learned that wanting to understand is a beautiful value.",
+          "During Ramadan, {{name}} listens to and reads from the Quran. The Quran is a book that guides us to be kind and fair. {{pronounCap}} learns that its words help the heart grow wiser and gentler.",
       },
       Arabic: {
         male: {
-          title: 'القراءة والتعلم',
-          description: '{{name}} يكتشف',
+          title: 'القرآن',
+          description: '{{name}} والقرآن',
           storyText:
-            "{{name}} يحب القراءة والتعلم في رمضان. قصص وكلمات طيبة وأشياء عن هذا الشهر الخاص. {{pronounCap}} يطرح أسئلة ويكبر بفهم أكثر. تعلم {{name}} أن الرغبة في الفهم قيمة جميلة.",
+            "في رمضان يستمع {{name}} ويقرأ من القرآن. القرآن كتاب يهدينا إلى اللطف والعدل. {{pronounCap}} يتعلم أن كلماته تساعد القلب أن يصبح أحكم وألطف.",
         },
         female: {
-          title: 'القراءة والتعلم',
-          description: '{{name}} تكتشف',
+          title: 'القرآن',
+          description: '{{name}} والقرآن',
           storyText:
-            "{{name}} تحب القراءة والتعلم في رمضان. قصص وكلمات طيبة وأشياء عن هذا الشهر الخاص. {{pronounCap}} تطرح أسئلة وتكبر بفهم أكثر. تعلمت {{name}} أن الرغبة في الفهم قيمة جميلة.",
+            "في رمضان تستمع {{name}} وتقرأ من القرآن. القرآن كتاب يهدينا إلى اللطف والعدل. {{pronounCap}} تتعلم أن كلماته تساعد القلب أن يصبح أحكم وألطف.",
         },
       },
       Spanish: {
-        title: 'Leer y aprender',
-        description: '{{name}} descubre',
+        title: 'El Corán',
+        description: '{{name}} y el Corán',
         storyText:
-          "A {{name}} le encanta leer y aprender durante el Ramadán. Historias, palabras amables, cosas sobre este mes tan especial. {{pronounCap}} hace preguntas y crece entendiendo más. {{name}} aprendió que querer entender es un valor hermoso.",
+          "Durante el Ramadán, {{name}} escucha y lee el Corán. El Corán es un libro que nos guía a ser bondadosos y justos. {{pronounCap}} aprende que sus palabras ayudan al corazón a ser más sabio y amable.",
       },
     },
   },
@@ -604,44 +604,44 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
       },
     },
   },
-  // 11: Sharing with others (sadaqa – smile and kindness)
+  // 11: Forgiveness — replaced "Sharing with others"
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child on a garden path or front step with a bag or basket to give. Kind, generous expression. Only the child in frame.',
+      'Scene: A child sitting quietly in a softly lit room, thoughtful expression, hands gently together or holding a small note. Reflective and sincere mood.',
       'LEFT'
     ),
     content: {
       French: {
-        title: 'Partager avec les autres',
-        description: '{{name}} prépare un don',
+        title: 'Le pardon',
+        description: '{{name}} et le pardon',
         storyText:
-          "{{name}} a préparé un petit cadeau pour quelqu'un. Donner, même un peu, rend le cœur léger. {{pronounCap}} sait que la sadaqa peut être un sourire, un geste gentil ou une attention, pas seulement de l'argent. {{name}} a appris que la gentillesse est un trésor.",
+          "Pendant le Ramadan, {{name}} se souvient que tout le monde peut faire des erreurs. {{pronounCap}} dit « pardon » avec sincérité et pardonne aux autres aussi. {{name}} a appris que le pardon allège le cœur et rapproche les gens.",
       },
       English: {
-        title: 'Sharing with others',
-        description: '{{name}} prepares a gift',
+        title: 'Forgiveness',
+        description: '{{name}} and forgiveness',
         storyText:
-          "{{name}} prepared a small gift for someone. Giving, even a little, makes the heart light. {{pronounCap}} knows that sadaqa can be a smile, a kind gesture or a thoughtfulness, not only money. {{name}} learned that kindness is a treasure.",
+          "During Ramadan, {{name}} remembers that everyone makes mistakes. {{pronounCap}} says \"I'm sorry\" with sincerity and forgives others too. {{name}} learned that forgiveness makes the heart lighter and brings people closer together.",
       },
       Arabic: {
         male: {
-          title: 'المشاركة مع الآخرين',
-          description: '{{name}} يعد هدية',
+          title: 'المغفرة',
+          description: '{{name}} والمغفرة',
           storyText:
-            "أعد {{name}} هدية صغيرة لأحد. العطاء، ولو قليل، يخفف القلب. {{pronounCap}} يعرف أن الصدقة قد تكون ابتسامة أو لطفاً أو اهتماماً، وليس المال فقط. تعلم {{name}} أن اللطف كنز.",
+            "في رمضان يتذكر {{name}} أن الجميع يخطئ. {{pronounCap}} يقول «آسف» بصدق ويغفر للآخرين أيضاً. تعلم {{name}} أن المغفرة تخفف القلب وتقرب الناس من بعضهم.",
         },
         female: {
-          title: 'المشاركة مع الآخرين',
-          description: '{{name}} تعد هدية',
+          title: 'المغفرة',
+          description: '{{name}} والمغفرة',
           storyText:
-            "أعدت {{name}} هدية صغيرة لأحد. العطاء، ولو قليل، يخفف القلب. {{pronounCap}} تعرف أن الصدقة قد تكون ابتسامة أو لطفاً أو اهتماماً، وليس المال فقط. تعلمت {{name}} أن اللطف كنز.",
+            "في رمضان تتذكر {{name}} أن الجميع يخطئ. {{pronounCap}} تقول «آسفة» بصدق وتغفر للآخرين أيضاً. تعلمت {{name}} أن المغفرة تخفف القلب وتقرب الناس من بعضهم.",
         },
       },
       Spanish: {
-        title: 'Compartir con los demás',
-        description: '{{name}} prepara un regalo',
+        title: 'El perdón',
+        description: '{{name}} y el perdón',
         storyText:
-          "{{name}} preparó un pequeño regalo para alguien. Dar, aunque sea un poco, aligera el corazón. {{pronounCap}} sabe que la sadaqa puede ser una sonrisa, un gesto amable o un detalle, no solo dinero. {{name}} aprendió que la bondad es un tesoro.",
+          "Durante el Ramadán, {{name}} recuerda que todos cometemos errores. {{pronounCap}} dice «lo siento» con sinceridad y perdona a los demás también. {{name}} aprendió que el perdón aligera el corazón y acerca a las personas.",
       },
     },
   },
@@ -727,44 +727,44 @@ const RAMADAN_SCENES: RamadanSceneTemplate[] = [
       },
     },
   },
-  // 14: Last days / Laylat al-Qadr (hope, special night)
+  // 14: Laylat Al-Qadr (enhanced — child by window at night, hands in prayer)
   {
     promptTemplate: scenePromptTemplate(
-      'Scene: A child by a window or in a quiet spot at night, stars visible, gentle and hopeful. Last days of Ramadan. Only the child in frame.',
-      'LEFT'
+      'Scene: A child standing by a window or on a balcony at night, looking at a star-filled sky. Soft moonlight illuminates the face. Hands gently raised in prayer. Peaceful and hopeful mood. Uncluttered night sky on the text side (stars, moonlight, soft gradient).',
+      'RIGHT'
     ),
     content: {
       French: {
-        title: 'Les derniers jours',
+        title: 'Laylat Al-Qadr',
         description: '{{name}} et la Nuit du Destin',
         storyText:
-          "Nous voilà dans les derniers jours du Ramadan. {{name}} a entendu parler de la Nuit du Destin, une nuit si précieuse. {{pronounCap}} garde l'espoir et la gratitude dans son cœur. {{name}} a appris que croire en ces moments spéciaux remplit le cœur de lumière.",
+          "Ce sont les dernières nuits du Ramadan. {{name}} a entendu parler de Laylat Al-Qadr, une nuit meilleure que mille mois. {{pronounCap}} fait une prière silencieuse pour sa famille et pour le monde. {{name}} a appris que certaines nuits sont remplies d'une lumière et de bénédictions spéciales.",
       },
       English: {
-        title: 'The last days',
+        title: 'Laylat Al-Qadr',
         description: '{{name}} and the Night of Power',
         storyText:
-          "We are in the last days of Ramadan. {{name}} has heard about the Night of Power, such a precious night. {{pronounCap}} keeps hope and gratitude in {{pronounPossessive}} heart. {{name}} learned that believing in these special moments fills the heart with light.",
+          "These are the last nights of Ramadan. {{name}} has heard about Laylat Al-Qadr, a night better than a thousand months. {{pronounCap}} makes a quiet prayer for family and for the world. {{name}} learned that some nights are filled with special light and blessings.",
       },
       Arabic: {
         male: {
-          title: 'الأيام الأخيرة',
+          title: 'ليلة القدر',
           description: '{{name}} وليلة القدر',
           storyText:
-            "ها نحن في الأيام الأخيرة من رمضان. سمع {{name}} عن ليلة القدر، ليلة ثمينة. {{pronounCap}} يحتفظ بالأمل والشكر في قلبه. تعلم {{name}} أن الإيمان بهذه اللحظات الخاصة يملأ القلب نوراً.",
+            "هذه آخر ليالي رمضان. سمع {{name}} عن ليلة القدر، ليلة خير من ألف شهر. {{pronounCap}} يرفع دعاءً هادئاً لأسرته وللعالم. تعلم {{name}} أن بعض الليالي تملؤها نور وبركات خاصة.",
         },
         female: {
-          title: 'الأيام الأخيرة',
+          title: 'ليلة القدر',
           description: '{{name}} وليلة القدر',
           storyText:
-            "ها نحن في الأيام الأخيرة من رمضان. سمعت {{name}} عن ليلة القدر، ليلة ثمينة. {{pronounCap}} تحتفظ بالأمل والشكر في قلبها. تعلمت {{name}} أن الإيمان بهذه اللحظات الخاصة يملأ القلب نوراً.",
+            "هذه آخر ليالي رمضان. سمعت {{name}} عن ليلة القدر، ليلة خير من ألف شهر. {{pronounCap}} ترفع دعاءً هادئاً لأسرتها وللعالم. تعلمت {{name}} أن بعض الليالي تملؤها نور وبركات خاصة.",
         },
       },
       Spanish: {
-        title: 'Los últimos días',
+        title: 'Laylat Al-Qadr',
         description: '{{name}} y la Noche del Destino',
         storyText:
-          "Estamos en los últimos días del Ramadán. {{name}} ha oído hablar de la Noche del Destino, una noche tan preciosa. {{pronounCap}} guarda esperanza y gratitud en su corazón. {{name}} aprendió que creer en estos momentos especiales llena el corazón de luz.",
+          "Estas son las últimas noches del Ramadán. {{name}} ha oído hablar de Laylat Al-Qadr, una noche mejor que mil meses. {{pronounCap}} hace una oración tranquila por la familia y por el mundo. {{name}} aprendió que algunas noches están llenas de una luz y bendiciones especiales.",
       },
     },
   },
