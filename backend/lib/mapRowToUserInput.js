@@ -119,11 +119,14 @@ export function mapRamadanRowToUserInput(row) {
   const themes = String(row.themes || '').trim();
   const selectedThemes = themes ? themes.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : ['Amour'];
   const style = normalizeStyleKids(row.themes || row.style);
+  const genres = String(row.genres || '').trim().toLowerCase();
+  const gender = (genres.includes('femme') || genres.includes('fille') || genres === 'f') ? 'Female'
+    : (genres.includes('autre') || genres === 'other') ? 'Other' : 'Male';
   const theme = "Story Type: KIDS_RAMADAN. A heartwarming Ramadan story for a child. Same story structure for every child; only the child's name and gender (he/she) are personalized.";
   const userInput = {
     name: firstName,
     age: firstAge,
-    gender: 'Male',
+    gender,
     photoBase64: row.child1PhotoBase64 || undefined,
     audience: 'Kids',
     theme,
