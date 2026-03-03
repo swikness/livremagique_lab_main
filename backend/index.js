@@ -3,7 +3,10 @@
  * GAS calls POST /sheet/prepare or POST /sheet/prepareCover; app loads GET /sheet/session/:id.
  */
 import express from 'express';
+import multer from 'multer';
 import { mapRowToUserInput, mapRamadanRowToUserInput } from './lib/mapRowToUserInput.js';
+import { uploadPdf, uploadImage } from './lib/drive.js';
+import { callWebhook } from './lib/webhook.js';
 
 const app = express();
 
@@ -24,6 +27,8 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '50mb' })); // row can contain base64 images
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 const PORT = Number(process.env.PORT) || 8080;
 
@@ -168,6 +173,66 @@ app.get('/sheet/session/:id', (req, res) => {
       status: 'error',
       message: err.message || 'Application failed to respond',
     });
+  }
+});
+
+// POST /uploadCover — upload generated cover PNG to Drive and notify GAS webhook
+app.post('/uploadCover', upload.single('file'), async (req, res) => {
+  try {
+    const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName, coverColumn } = req.body || {};
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!folderId) return res.status(400).json({ error: 'Missing folderId' });
+    if (!spreadsheetId || !rowIndex) return res.status(400).json({ error: 'Missing spreadsheetId or rowIndex' });
+
+    const fileName = `${buyerName || 'Couverture'}-cover.png`;
+    const coverUrl = await uploadImage(folderId, req.file.buffer, fileName, req.file.mimetype || 'image/png');
+
+    await callWebhook(
+      webhookUrl,
+      webhookSecret,
+      spreadsheetId,
+      Number(rowIndex),
+      null,
+      null,
+      coverUrl,
+      sheetName,
+      coverColumn != null ? Number(coverColumn) : undefined
+    );
+
+    return res.status(200).json({ coverUrl });
+  } catch (err) {
+    console.error('POST /uploadCover error:', err);
+    return res.status(500).json({ error: err.message || 'Upload cover failed' });
+  }
+});
+
+// POST /uploadPdf — upload generated PDF to Drive and notify GAS webhook
+app.post('/uploadPdf', upload.single('file'), async (req, res) => {
+  try {
+    const { folderId, spreadsheetId, rowIndex, webhookUrl, webhookSecret, buyerName, sheetName } = req.body || {};
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!folderId) return res.status(400).json({ error: 'Missing folderId' });
+    if (!spreadsheetId || !rowIndex) return res.status(400).json({ error: 'Missing spreadsheetId or rowIndex' });
+
+    const fileName = `${buyerName || 'Livre'}.pdf`;
+    const pdfUrl = await uploadPdf(req.file.buffer, folderId, fileName);
+
+    await callWebhook(
+      webhookUrl,
+      webhookSecret,
+      spreadsheetId,
+      Number(rowIndex),
+      'PDF Prêt',
+      pdfUrl,
+      null,
+      sheetName,
+      undefined
+    );
+
+    return res.status(200).json({ pdfUrl });
+  } catch (err) {
+    console.error('POST /uploadPdf error:', err);
+    return res.status(500).json({ error: err.message || 'Upload PDF failed' });
   }
 });
 

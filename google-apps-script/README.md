@@ -10,9 +10,9 @@ There is **one script file**: **FormHandler.gs**. Copy its contents into your Go
 
 ## Column O (app link)
 
-- Use this formula so "Open" goes through Vercel and redirects straight to the app (no raw HTML):
-  **O2**: `=HYPERLINK("https://livremagique-lab-main.vercel.app/api/open?sheet=kids_orders&row="&ROW(),"Open")` — fill down for O3, O4, …
-- **Vercel env var:** In the Vercel project, set **GAS_EXEC_URL** = your GAS Web App exec URL (e.g. `https://script.google.com/macros/s/xxx/exec`). The API route calls the script with `format=json` and redirects the browser to the app.
+- Use the **direct GAS link** in the formula (no Vercel /api/open). The script shows a page with the app link and a "Copier le lien" button; if the page appears as raw code, the URL is shown in a box so you can copy it.
+- **O2** (fill down):  
+  `=HYPERLINK("https://script.google.com/macros/s/AKfycbxW5Yf0Yf5aapLGwP10eZVp-ovoFtCowGTJsj9G_Tgnta_esnI9MsCF-7VX-gDIMqQofQ/exec?action=openApp&sheetName=kids_orders&rowIndex="&ROW(),"Open")`
 
 ## Script properties
 

@@ -19,12 +19,18 @@ export default async function handler(req, res) {
   if (!GAS_EXEC_URL || !GAS_EXEC_URL.includes('/exec')) {
     return res.status(500).json({ error: 'GAS_EXEC_URL not configured. Set it in Vercel env vars.' });
   }
-  const gasUrl = `${GAS_EXEC_URL.replace(/\/$/, '')}?action=openApp&sheetName=${encodeURIComponent(sheet)}&rowIndex=${rowIndex}&format=json`;
+  const baseUrl = GAS_EXEC_URL.replace(/\/$/, '').split('?')[0];
+  const gasUrl = `${baseUrl}?action=openApp&sheetName=${encodeURIComponent(sheet)}&rowIndex=${rowIndex}&format=json`;
   try {
     const r = await fetch(gasUrl, { redirect: 'follow' });
     const text = await r.text();
     if (!r.ok) {
-      return res.status(502).send(`Script error: ${text || r.status}`);
+      return res.status(502).send(`Script error (${r.status}): ${text.slice(0, 200) || r.status}`);
+    }
+    if (!text || text.trim().startsWith('<')) {
+      return res.status(502).send(
+        'Script returned HTML instead of JSON. Check: 1) GAS_EXEC_URL is the full exec URL (ends with /exec). 2) In Apps Script, doGet reads the "format" parameter and returns JSON when format=json. 3) Redeploy the script after changes.'
+      );
     }
     const data = JSON.parse(text);
     const redirectUrl = data && data.redirectUrl;
