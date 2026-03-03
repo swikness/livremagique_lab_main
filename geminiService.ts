@@ -377,8 +377,8 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
 
   console.log(`Generating Image for scene... Style: ${activeStyle}`);
 
-  // UPGRADE: Using gemini-3-pro for images as requested
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+  const PRIMARY_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+  const FALLBACK_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
   // Append Aspect Ratio to the prompt manually since it's an experimental model
   const aspectRatioIntruction = scene.aspectRatio === '1:1' ? 'Aspect Ratio: 1:1 Square' : 'Aspect Ratio: 16:9 Wide';
@@ -386,9 +386,11 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
 
   const maxRetries = 3;
   let retryCount = 0;
+  let currentModel = PRIMARY_IMAGE_MODEL;
 
   while (retryCount <= maxRetries) {
     try {
+      const model = genAI.getGenerativeModel({ model: currentModel });
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: finalPromptWithRatio }, ...parts.slice(1)] }]
       });
@@ -403,17 +405,28 @@ export const generateSceneImage = async (scene: Scene, baseStyle: StoryStyle, ma
       }
     } catch (error: any) {
       retryCount++;
-      console.warn(`Image generation attempt ${retryCount} failed:`, error.message);
+      const msg = error.message || '';
+      console.warn(`Image generation attempt ${retryCount} failed (model: ${currentModel}):`, msg);
+
+      const is503 = msg.includes('503') || msg.includes('Overloaded') || msg.includes('high demand');
+
+      // On 503: switch to fallback model immediately (only once)
+      if (is503 && currentModel === PRIMARY_IMAGE_MODEL) {
+        console.warn('503 detected — switching to fallback model:', FALLBACK_IMAGE_MODEL);
+        currentModel = FALLBACK_IMAGE_MODEL;
+        // Don't count this as a retry, just swap the model and try again immediately
+        retryCount--;
+        continue;
+      }
 
       if (retryCount > maxRetries) {
         let errorMessage = "Image generation failed.";
-        const msg = error.message || '';
 
         if (msg.includes('500') || msg.includes('Internal error')) {
           errorMessage = "Google AI Server Error (500). The service is temporarily overloaded. Please try again in 1 minute.";
         } else if (msg.includes('429') || msg.includes('quota')) {
           errorMessage = "Rate Limit Exceeded. You are generating too fast. Please wait 1-2 minutes.";
-        } else if (msg.includes('503') || msg.includes('Overloaded')) {
+        } else if (is503) {
           errorMessage = "Model Overloaded (503). Google's servers are busy. Please retry.";
         } else if (msg.includes('400') && (msg.includes('Image') || msg.includes('payload'))) {
           errorMessage = "Image Upload Error. Your reference photo might be too large or invalid. Try a smaller photo.";
