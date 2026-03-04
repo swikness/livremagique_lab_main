@@ -13,8 +13,11 @@ var ACCESS_TOKEN = "EAACopQs0dlwBQuZCsmmLnjJpgZCU1XJxv0J7kSEas9A3acmTzu2Bu3sfkln
 // 3. YOUR GOOGLE DRIVE FOLDER ID (Where photos will be saved)
 var FOLDER_ID = "1h0BPEP6IQWczNJC2TQ-x4ztlLnMpgYht";
 
-// 4. Folder where generated book PDFs are saved (fixed)
+// 4. Folder where generated cover PDFs are saved (fixed)
 var PDF_OUTPUT_FOLDER_ID = "1b5gfij0uyZ9NZLJbiCk-me6SJD7WPm_o";
+
+// 5. Folder where finished book PDFs are saved (change this to your book folder)
+var BOOK_OUTPUT_FOLDER_ID = "CHANGE_ME_BOOK_FOLDER_ID";
 
 // Column numbers: V=22 Couverture, W=23 Status Livre, X=24 Livre PDF
 var COL_COUVERTURE = 22;
@@ -31,7 +34,8 @@ var KIDS_COL_COUVERTURE_1 = 19;
 var KIDS_COL_COUVERTURE_2 = 20;
 var KIDS_COL_COUVERTURE_3 = 21;
 var KIDS_COL_STATUS_LIVRE = 22;
-var KIDS_COL_LIEN_PDF = 23;
+var KIDS_COL_LIEN_PDF = 23; // Column W — repurposed as Book checkbox
+var KIDS_COL_BOOK = 23;     // Column W: Book checkbox → popup with per-kid book links
 var KIDS_COL_APP_URL = 24;
 var KIDS_COL_STATUT_CHANGE_LE = 25;  // Y
 var KIDS_COL_RELANCE_1 = 26;
@@ -447,45 +451,42 @@ function runGenererCouvertureKids(sheet, rowIndex) {
   }
 }
 
-// --- Open app for row: same as runGenererCouvertureKids but shows "Ouvrir l'app" popup with link only (no redirect) ---
+// Split comma-separated field into trimmed array, padded to minLen with fallback value
+function splitKidField(value, minLen, fallback) {
+  var arr = String(value || "").split(",").map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+  while (arr.length < minLen) arr.push(fallback || "");
+  return arr;
+}
+
+// --- Open app for row: multi-kid cover links based on column D (Quantité) ---
 function runOpenAppForRow(sheet, rowIndex) {
-  var ui = SpreadsheetApp.getUi();
+  var ui = null;
+  try { ui = SpreadsheetApp.getUi(); } catch (e) {}
   try {
     var ss = sheet.getParent();
     var backendUrl = PropertiesService.getScriptProperties().getProperty("BACKEND_URL");
     var appUrl = PropertiesService.getScriptProperties().getProperty("APP_URL");
     if (!backendUrl || !appUrl) {
-      ui.alert("BACKEND_URL ou APP_URL manquant. Paramètres du projet > Propriétés du script.");
+      if (ui) ui.alert("BACKEND_URL ou APP_URL manquant. Paramètres du projet > Propriétés du script.");
+      else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue("Config manquante: BACKEND_URL ou APP_URL");
       return;
     }
-    var rowValues = sheet.getRange(rowIndex, 1, rowIndex, KIDS_ORDERS_COLS).getValues()[0];
-    var photo1Url = rowValues[KIDS_COL_PHOTO1 - 1] ? String(rowValues[KIDS_COL_PHOTO1 - 1]).trim() : "";
-    var photo2Url = rowValues[KIDS_COL_PHOTO2 - 1] ? String(rowValues[KIDS_COL_PHOTO2 - 1]).trim() : "";
-    var photo3Url = rowValues[KIDS_COL_PHOTO3 - 1] ? String(rowValues[KIDS_COL_PHOTO3 - 1]).trim() : "";
-    var cov1 = rowValues[KIDS_COL_COUVERTURE_1 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_1 - 1]).trim() : "";
-    var cov2 = rowValues[KIDS_COL_COUVERTURE_2 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_2 - 1]).trim() : "";
-    var cov3 = rowValues[KIDS_COL_COUVERTURE_3 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_3 - 1]).trim() : "";
-    var coverIndex = 0;
-    var kidBase64 = "";
-    if (!cov1 && photo1Url) {
-      coverIndex = 1;
-      kidBase64 = fetchDrivePhotoAsBase64(photo1Url);
-    } else if (cov1 && !cov2 && photo2Url) {
-      coverIndex = 2;
-      kidBase64 = fetchDrivePhotoAsBase64(photo2Url);
-    } else if (cov1 && cov2 && !cov3 && photo3Url) {
-      coverIndex = 3;
-      kidBase64 = fetchDrivePhotoAsBase64(photo3Url);
-    }
-    if (!coverIndex || !kidBase64) {
-      if (cov1 && cov2 && cov3) {
-        ui.alert("Les trois couvertures pour cette ligne sont déjà générées.");
-      } else {
-        ui.alert("Pour la prochaine couverture, une photo enfant est requise (Photo enfant " + (cov1 && !cov2 ? "2" : cov2 ? "3" : "1") + ").");
-      }
-      return;
-    }
-    var coverColumn = KIDS_COL_COUVERTURE_1 + coverIndex - 1;
+    var rowValues = sheet.getRange(rowIndex, 1, 1, KIDS_ORDERS_COLS).getValues()[0];
+    var kidCount = parseInt(rowValues[3], 10) || 1; // Column D = Quantité
+    if (kidCount < 1) kidCount = 1;
+    if (kidCount > 3) kidCount = 3;
+
+    var prenoms = splitKidField(rowValues[KIDS_COL_PRENOMS - 1], kidCount, "Enfant");
+    var ages = splitKidField(rowValues[KIDS_COL_AGES - 1], kidCount, "8");
+    var genres = splitKidField(rowValues[KIDS_COL_GENRES - 1], kidCount, "");
+    var langues = splitKidField(rowValues[8], kidCount, "Français");
+    var themes = splitKidField(rowValues[9], kidCount, "");
+    var photoUrls = [
+      rowValues[KIDS_COL_PHOTO1 - 1] ? String(rowValues[KIDS_COL_PHOTO1 - 1]).trim() : "",
+      rowValues[KIDS_COL_PHOTO2 - 1] ? String(rowValues[KIDS_COL_PHOTO2 - 1]).trim() : "",
+      rowValues[KIDS_COL_PHOTO3 - 1] ? String(rowValues[KIDS_COL_PHOTO3 - 1]).trim() : ""
+    ];
+
     var webhookSecret = PropertiesService.getScriptProperties().getProperty("WEBHOOK_SECRET") || "";
     var webhookUrl = PropertiesService.getScriptProperties().getProperty("WEBHOOK_URL") || "";
     if (!webhookUrl) {
@@ -493,59 +494,203 @@ function runOpenAppForRow(sheet, rowIndex) {
     }
     var baseUrl = backendUrl.replace(/\/createBook\/?$/, "").replace(/\/$/, "");
     var prepareUrl = baseUrl + "/sheet/prepareCover";
-    var payload = {
-      spreadsheetId: ss.getId(),
-      sheetName: "kids_orders",
-      rowIndex: rowIndex,
-      outputFolderId: PDF_OUTPUT_FOLDER_ID,
-      webhookUrl: webhookUrl,
-      webhookSecret: webhookSecret,
-      type: "ramadan",
-      coverColumn: coverColumn,
-      row: {
-        date: rowValues[0],
-        buyerName: rowValues[KIDS_COL_NOM - 1],
-        phone: rowValues[2],
-        pack: rowValues[3],
-        price: rowValues[4],
-        prenoms: rowValues[KIDS_COL_PRENOMS - 1],
-        ages: rowValues[KIDS_COL_AGES - 1] != null ? String(rowValues[KIDS_COL_AGES - 1]).trim() : "",
-        genres: rowValues[KIDS_COL_GENRES - 1] != null ? String(rowValues[KIDS_COL_GENRES - 1]).trim() : "",
-        langues: rowValues[8],
-        themes: rowValues[9],
-        status: rowValues[KIDS_COL_STATUS_LIVRE - 1],
-        child1PhotoUrl: photo1Url,
-        child2PhotoUrl: photo2Url,
-        child3PhotoUrl: photo3Url,
-        child1PhotoBase64: coverIndex === 1 ? kidBase64 : "",
-        child2PhotoBase64: coverIndex === 2 ? kidBase64 : "",
-        child3PhotoBase64: coverIndex === 3 ? kidBase64 : "",
-        coverImageBase64: ""
+
+    var links = []; // { label, url }
+    for (var i = 0; i < kidCount; i++) {
+      var photoUrl = photoUrls[i] || "";
+      if (!photoUrl) {
+        links.push({ label: prenoms[i] + " (pas de photo)", url: "" });
+        continue;
       }
-    };
-    var resp = UrlFetchApp.fetch(prepareUrl, {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true,
-      fetchTimeoutSeconds: 60
-    });
-    var code = resp.getResponseCode();
-    var body = resp.getContentText();
-    if (code >= 200 && code < 300) {
-      var data = JSON.parse(body || "{}");
-      var sessionId = data.sessionId;
-      if (sessionId) {
-        var openUrl = appUrl.replace(/\/$/, "") + "?fromSheet=" + sessionId + "&template=ramadan";
-        showClickableLinkDialog("Ouvrir l'app", openUrl, "Cliquez sur le lien pour ouvrir l'app avec les données de la ligne préremplies. Une nouvelle fenêtre a été ouverte si possible.", true);
+      var kidBase64 = fetchDrivePhotoAsBase64(photoUrl);
+      if (!kidBase64) {
+        links.push({ label: prenoms[i] + " (photo inaccessible)", url: "" });
+        continue;
+      }
+      var coverColumn = KIDS_COL_COUVERTURE_1 + i;
+      var payload = {
+        spreadsheetId: ss.getId(),
+        sheetName: "kids_orders",
+        rowIndex: rowIndex,
+        outputFolderId: PDF_OUTPUT_FOLDER_ID,
+        webhookUrl: webhookUrl,
+        webhookSecret: webhookSecret,
+        type: "ramadan",
+        coverColumn: coverColumn,
+        row: {
+          date: rowValues[0],
+          buyerName: rowValues[KIDS_COL_NOM - 1],
+          phone: rowValues[2],
+          pack: rowValues[3],
+          price: rowValues[4],
+          prenoms: prenoms[i],
+          ages: ages[i],
+          genres: genres[i],
+          langues: langues[i],
+          themes: themes[i],
+          status: rowValues[KIDS_COL_STATUS_LIVRE - 1],
+          child1PhotoUrl: photoUrl,
+          child1PhotoBase64: kidBase64,
+          coverImageBase64: ""
+        }
+      };
+      var resp = UrlFetchApp.fetch(prepareUrl, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true,
+        fetchTimeoutSeconds: 60
+      });
+      var code = resp.getResponseCode();
+      var body = resp.getContentText();
+      if (code >= 200 && code < 300) {
+        var data = JSON.parse(body || "{}");
+        if (data.sessionId) {
+          var openUrl = appUrl.replace(/\/$/, "") + "?fromSheet=" + data.sessionId + "&template=ramadan";
+          links.push({ label: "Couverture " + (i + 1) + " – " + prenoms[i], url: openUrl });
+        } else {
+          links.push({ label: prenoms[i] + " (erreur: pas de sessionId)", url: "" });
+        }
       } else {
-        ui.alert("Erreur: le serveur n'a pas renvoyé de sessionId.");
+        links.push({ label: prenoms[i] + " (erreur " + code + ")", url: "" });
       }
-    } else {
-      ui.alert("Erreur (" + code + "): " + (body || "Vérifiez les logs."));
+    }
+
+    var validLinks = links.filter(function(l) { return l.url; });
+    if (validLinks.length === 0) {
+      var msg = "Aucun lien généré. Vérifiez les photos et la quantité.";
+      if (ui) ui.alert(msg);
+      else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue(msg);
+      return;
+    }
+    // Write first link to column X for mobile
+    sheet.getRange(rowIndex, KIDS_COL_APP_URL).setFormula('=HYPERLINK("' + validLinks[0].url.replace(/"/g, '\\"') + '","' + validLinks[0].label.replace(/"/g, '\\"') + '")');
+    if (ui) {
+      showMultiLinkDialog("Ouvrir l'app – Couvertures", links);
     }
   } catch (err) {
-    ui.alert("Erreur: " + err.toString());
+    if (ui) ui.alert("Erreur: " + err.toString());
+    else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue("Erreur: " + err.toString().substring(0, 200));
+  }
+}
+
+// --- Open book for row: shows 1-3 app links for full book creation based on filled covers ---
+function runOpenBookForRow(sheet, rowIndex) {
+  var ui = null;
+  try { ui = SpreadsheetApp.getUi(); } catch (e) {}
+  try {
+    var ss = sheet.getParent();
+    var backendUrl = PropertiesService.getScriptProperties().getProperty("BACKEND_URL");
+    var appUrl = PropertiesService.getScriptProperties().getProperty("APP_URL");
+    var bookFolderId = BOOK_OUTPUT_FOLDER_ID;
+    if (!backendUrl || !appUrl) {
+      if (ui) ui.alert("BACKEND_URL ou APP_URL manquant. Paramètres du projet > Propriétés du script.");
+      else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue("Config manquante: BACKEND_URL ou APP_URL");
+      return;
+    }
+    var rowValues = sheet.getRange(rowIndex, 1, 1, KIDS_ORDERS_COLS).getValues()[0];
+    var kidCount = parseInt(rowValues[3], 10) || 1;
+    if (kidCount < 1) kidCount = 1;
+    if (kidCount > 3) kidCount = 3;
+
+    var prenoms = splitKidField(rowValues[KIDS_COL_PRENOMS - 1], kidCount, "Enfant");
+    var ages = splitKidField(rowValues[KIDS_COL_AGES - 1], kidCount, "8");
+    var genres = splitKidField(rowValues[KIDS_COL_GENRES - 1], kidCount, "");
+    var langues = splitKidField(rowValues[8], kidCount, "Français");
+    var themes = splitKidField(rowValues[9], kidCount, "");
+    var photoUrls = [
+      rowValues[KIDS_COL_PHOTO1 - 1] ? String(rowValues[KIDS_COL_PHOTO1 - 1]).trim() : "",
+      rowValues[KIDS_COL_PHOTO2 - 1] ? String(rowValues[KIDS_COL_PHOTO2 - 1]).trim() : "",
+      rowValues[KIDS_COL_PHOTO3 - 1] ? String(rowValues[KIDS_COL_PHOTO3 - 1]).trim() : ""
+    ];
+    var coverUrls = [
+      rowValues[KIDS_COL_COUVERTURE_1 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_1 - 1]).trim() : "",
+      rowValues[KIDS_COL_COUVERTURE_2 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_2 - 1]).trim() : "",
+      rowValues[KIDS_COL_COUVERTURE_3 - 1] ? String(rowValues[KIDS_COL_COUVERTURE_3 - 1]).trim() : ""
+    ];
+
+    var webhookSecret = PropertiesService.getScriptProperties().getProperty("WEBHOOK_SECRET") || "";
+    var webhookUrl = PropertiesService.getScriptProperties().getProperty("WEBHOOK_URL") || "";
+    if (!webhookUrl) {
+      try { webhookUrl = ScriptApp.getService().getUrl() || ""; } catch (e) {}
+    }
+    var baseUrl = backendUrl.replace(/\/createBook\/?$/, "").replace(/\/$/, "");
+    var prepareUrl = baseUrl + "/sheet/prepareBook";
+
+    var links = [];
+    for (var i = 0; i < kidCount; i++) {
+      if (!coverUrls[i]) {
+        links.push({ label: prenoms[i] + " (couverture manquante)", url: "" });
+        continue;
+      }
+      var coverBase64 = fetchDrivePhotoAsBase64(coverUrls[i]);
+      var kidBase64 = photoUrls[i] ? fetchDrivePhotoAsBase64(photoUrls[i]) : "";
+      if (!coverBase64) {
+        links.push({ label: prenoms[i] + " (couverture inaccessible)", url: "" });
+        continue;
+      }
+      var payload = {
+        spreadsheetId: ss.getId(),
+        sheetName: "kids_orders",
+        rowIndex: rowIndex,
+        outputFolderId: bookFolderId,
+        webhookUrl: webhookUrl,
+        webhookSecret: webhookSecret,
+        type: "ramadan",
+        kidIndex: i + 1,
+        row: {
+          date: rowValues[0],
+          buyerName: rowValues[KIDS_COL_NOM - 1],
+          phone: rowValues[2],
+          pack: rowValues[3],
+          price: rowValues[4],
+          prenoms: prenoms[i],
+          ages: ages[i],
+          genres: genres[i],
+          langues: langues[i],
+          themes: themes[i],
+          status: rowValues[KIDS_COL_STATUS_LIVRE - 1],
+          child1PhotoUrl: photoUrls[i],
+          child1PhotoBase64: kidBase64 || "",
+          coverImageBase64: coverBase64
+        }
+      };
+      var resp = UrlFetchApp.fetch(prepareUrl, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true,
+        fetchTimeoutSeconds: 60
+      });
+      var code = resp.getResponseCode();
+      var body = resp.getContentText();
+      if (code >= 200 && code < 300) {
+        var data = JSON.parse(body || "{}");
+        if (data.sessionId) {
+          var openUrl = appUrl.replace(/\/$/, "") + "?fromSheet=" + data.sessionId + "&template=ramadan";
+          links.push({ label: "Livre " + (i + 1) + " – " + prenoms[i], url: openUrl });
+        } else {
+          links.push({ label: prenoms[i] + " (erreur: pas de sessionId)", url: "" });
+        }
+      } else {
+        links.push({ label: prenoms[i] + " (erreur " + code + ")", url: "" });
+      }
+    }
+
+    var validLinks = links.filter(function(l) { return l.url; });
+    if (validLinks.length === 0) {
+      var msg = "Aucun lien de livre généré. Vérifiez que les couvertures sont remplies.";
+      if (ui) ui.alert(msg);
+      else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue(msg);
+      return;
+    }
+    sheet.getRange(rowIndex, KIDS_COL_APP_URL).setFormula('=HYPERLINK("' + validLinks[0].url.replace(/"/g, '\\"') + '","' + validLinks[0].label.replace(/"/g, '\\"') + '")');
+    if (ui) {
+      showMultiLinkDialog("Créer les livres", links);
+    }
+  } catch (err) {
+    if (ui) ui.alert("Erreur: " + err.toString());
+    else sheet.getRange(rowIndex, KIDS_COL_APP_URL).setValue("Erreur: " + err.toString().substring(0, 200));
   }
 }
 
@@ -825,10 +970,17 @@ function onEdit(e) {
     return;
   }
 
-  // Column O (APP): checkbox → check = open app popup, then uncheck
+  // Column O (APP): checkbox → check = open app cover popup, then uncheck
   if (col === KIDS_COL_APP && e.value === "TRUE") {
     e.range.setValue(false);
     runOpenAppForRow(sheet, rowIndex);
+    return;
+  }
+
+  // Column W (BOOK): checkbox → check = open book creation popup, then uncheck
+  if (col === KIDS_COL_BOOK && e.value === "TRUE") {
+    e.range.setValue(false);
+    runOpenBookForRow(sheet, rowIndex);
     return;
   }
 
@@ -883,6 +1035,28 @@ function showClickableLinkDialog(title, url, instructionText, autoOpenInNewTab) 
   var openScript = (autoOpenInNewTab && url) ? "<script>setTimeout(function(){ try { window.open(\"" + urlJs + "\", \"_blank\"); } catch(e) {} }, 200);<\/script>" : "";
   var html = "<!DOCTYPE html><html><head><meta charset='utf-8'><style>body{font-family:sans-serif;padding:16px;} p{margin:0 0 10px 0;} a{color:#1967d2;text-decoration:underline;word-break:break-all;}</style></head><body>" + openScript + "<p><strong>" + safeText + "</strong></p><p><a href=\"" + safeUrl + "\" target=\"_blank\">" + safeUrl + "</a></p><p style='margin-top:14px;font-size:12px;color:#666;'>Fermez avec le X après avoir ouvert le lien.</p></body></html>";
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(480).setHeight(160), title);
+}
+
+// Shared: show a dialog with multiple clickable links (used for multi-kid cover/book links).
+// links = [{ label: "Couverture 1 – Yassine", url: "https://..." }, ...]
+// Items with empty url are shown as disabled/error text.
+function showMultiLinkDialog(title, links) {
+  var linksHtml = "";
+  for (var i = 0; i < links.length; i++) {
+    var l = links[i];
+    var safeLabel = String(l.label || "").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    if (l.url) {
+      var safeUrl = l.url.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      linksHtml += "<p style='margin:8px 0;'><a href=\"" + safeUrl + "\" target=\"_blank\" style='color:#1967d2;text-decoration:underline;font-size:14px;'>" + safeLabel + "</a></p>";
+    } else {
+      linksHtml += "<p style='margin:8px 0;color:#999;font-size:13px;'>" + safeLabel + "</p>";
+    }
+  }
+  var html = "<!DOCTYPE html><html><head><meta charset='utf-8'><style>body{font-family:sans-serif;padding:16px;} a{word-break:break-all;}</style></head><body>" +
+    "<p><strong>Cliquez sur un lien pour ouvrir l'app :</strong></p>" + linksHtml +
+    "<p style='margin-top:14px;font-size:12px;color:#666;'>Fermez avec le X après avoir ouvert les liens.</p></body></html>";
+  var height = 120 + links.length * 40;
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(480).setHeight(height), title);
 }
 
 // WhatsApp: open wa.me link with prefilled message; dialog auto-opens the link in a new tab, and shows the link as fallback.
@@ -1005,10 +1179,13 @@ function doGet(e) {
       var spread = SpreadsheetApp.openById(spreadsheetId);
       var sheet = spread.getSheetByName(sheetName) || spread.getSheets()[0];
       var colStatus = (sheetName === "kids_orders") ? KIDS_COL_STATUS_LIVRE : COL_STATUS_LIVRE;
-      var colPdf = (sheetName === "kids_orders") ? KIDS_COL_LIEN_PDF : COL_LIEN_PDF;
       var colCover = (sheetName === "kids_orders" && coverColumnParam) ? parseInt(coverColumnParam, 10) : (sheetName === "kids_orders" ? KIDS_COL_COUVERTURE_1 : COL_COUVERTURE);
       if (status) sheet.getRange(rowIndex, colStatus).setValue(status);
-      if (pdfUrl) sheet.getRange(rowIndex, colPdf).setValue(pdfUrl);
+      // For kids_orders, column W is now a Book checkbox — skip writing PDF URL there
+      if (pdfUrl && sheetName !== "kids_orders") {
+        var colPdf = COL_LIEN_PDF;
+        sheet.getRange(rowIndex, colPdf).setValue(pdfUrl);
+      }
       if (coverUrl) sheet.getRange(rowIndex, colCover).setValue(coverUrl);
       return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
     }

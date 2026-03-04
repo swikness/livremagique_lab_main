@@ -153,6 +153,68 @@ app.post('/sheet/prepareCover', (req, res) => {
   }
 });
 
+// POST /sheet/prepareBook — "Créer le livre" (kids/Ramadan book with cover pre-loaded)
+app.post('/sheet/prepareBook', (req, res) => {
+  try {
+    const {
+      spreadsheetId,
+      sheetName,
+      rowIndex,
+      outputFolderId,
+      webhookUrl,
+      webhookSecret,
+      type,
+      kidIndex,
+      row,
+    } = req.body || {};
+
+    if (!spreadsheetId || !rowIndex || row == null) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: 'Missing spreadsheetId, rowIndex, or row',
+      });
+    }
+
+    const isRamadan = type === 'ramadan' || (sheetName && String(sheetName).toLowerCase() === 'kids_orders');
+    const { userInput, theme } = isRamadan
+      ? mapRamadanRowToUserInput(row)
+      : mapRowToUserInput(row);
+
+    const coverBase64 = (row && row.coverImageBase64) ? String(row.coverImageBase64) : null;
+
+    const session = {
+      userInput,
+      theme: theme || userInput.theme,
+      coverBase64,
+      coverOnly: false,
+      bookMode: true,
+      outputFolderId: outputFolderId || '',
+      spreadsheetId,
+      rowIndex: Number(rowIndex),
+      webhookUrl: webhookUrl || '',
+      webhookSecret: webhookSecret || '',
+      buyerName: (row && (row.buyerName != null)) ? String(row.buyerName) : 'Livre',
+      sessionType: isRamadan ? 'ramadan' : undefined,
+      sheetName: sheetName || (isRamadan ? 'kids_orders' : 'lovers_orders'),
+      kidIndex: kidIndex != null ? Number(kidIndex) : undefined,
+      row,
+    };
+
+    const sessionId = generateSessionId();
+    sessions.set(sessionId, session);
+
+    return res.status(200).json({ sessionId });
+  } catch (err) {
+    console.error('POST /sheet/prepareBook error:', err);
+    return res.status(500).json({
+      status: 'error',
+      code: 500,
+      message: err.message || 'Application failed to respond',
+    });
+  }
+});
+
 // GET /sheet/session/:id — app loads session when opening ?fromSheet=sessionId
 app.get('/sheet/session/:id', (req, res) => {
   try {

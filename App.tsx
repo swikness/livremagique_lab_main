@@ -107,6 +107,9 @@ const TRANSLATIONS = {
     sendToDrive: "Envoyer vers Drive",
     pdfSentToDrive: "PDF envoyé vers Drive. La sheet a été mise à jour.",
     sendConfirm: "Confirmer et envoyer",
+    bookSendToDrive: "Confirmer et envoyer le livre",
+    bookNotReady: "Générez et divisez toutes les scènes avant d'envoyer.",
+    bookSent: "Livre PDF envoyé vers Drive.",
     coverSentToDrive: "Couverture envoyée vers Drive. La sheet a été mise à jour (colonne V).",
     dataLoadedFromSheetCover: "Générez la couverture ci-dessous puis cliquez sur Confirmer et envoyer pour enregistrer le lien en colonne V.",
     storyTemplate: "Modèle d'histoire",
@@ -180,6 +183,9 @@ const TRANSLATIONS = {
     sendToDrive: "Send to Drive",
     pdfSentToDrive: "PDF sent to Drive. Sheet has been updated.",
     sendConfirm: "Send confirm",
+    bookSendToDrive: "Confirm & send book",
+    bookNotReady: "Generate and split all scenes before sending.",
+    bookSent: "Book PDF sent to Drive.",
     coverSentToDrive: "Cover sent to Drive. Sheet updated (column V).",
     dataLoadedFromSheetCover: "Generate the cover below then click Send confirm to save the link in column V.",
     storyTemplate: "Story Template",
@@ -379,6 +385,7 @@ const App: React.FC = () => {
   const [sheetContext, setSheetContext] = useState<SheetContext | null>(null);
   const [sheetCoverBase64, setSheetCoverBase64] = useState<string | null>(null);
   const [sheetCoverOnlyMode, setSheetCoverOnlyMode] = useState(false);
+  const [sheetBookMode, setSheetBookMode] = useState(false);
   const [fromSheetLoading, setFromSheetLoading] = useState(false);
   const [fromSheetError, setFromSheetError] = useState<string | null>(null);
 
@@ -420,6 +427,7 @@ const App: React.FC = () => {
         theme: string;
         coverBase64: string | null;
         coverOnly?: boolean;
+        bookMode?: boolean;
         outputFolderId: string;
         spreadsheetId: string;
         rowIndex: number;
@@ -429,6 +437,7 @@ const App: React.FC = () => {
         sessionType?: string;
         sheetName?: string;
         coverColumn?: number;
+        kidIndex?: number;
         row?: { prenoms?: string; ages?: string; langues?: string; themes?: string; child1PhotoBase64?: string; child2PhotoBase64?: string; child3PhotoBase64?: string };
       }) => {
         const themeStr = data.theme ?? data.userInput?.theme ?? '';
@@ -479,6 +488,7 @@ const App: React.FC = () => {
         }
         setSheetCoverBase64(data.coverBase64 || null);
         setSheetCoverOnlyMode(!!data.coverOnly);
+        setSheetBookMode(!!data.bookMode);
         if (data.coverOnly) setQuickCoverVisible(true);
       })
       .catch((e: Error) => setFromSheetError(e.message || 'Failed to load session'))
@@ -1506,6 +1516,48 @@ const App: React.FC = () => {
     }
   };
 
+  // Book mode: check if all scenes are generated and inner scenes are split
+  const isBookReady = (() => {
+    if (!storyPlan || !sheetBookMode) return false;
+    const lastIdx = storyPlan.scenes.length - 1;
+    for (let i = 0; i <= lastIdx; i++) {
+      const scene = storyPlan.scenes[i];
+      if (!scene.imageUrl || scene.status !== 'done') return false;
+      if (i > 0 && i < lastIdx && !scene.splitImages) return false;
+    }
+    return true;
+  })();
+
+  const handleSendBookToDrive = async () => {
+    if (!sheetContext || !storyPlan || !isBookReady) return;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const blob = await buildSquarePdfForDrive();
+      const form = new FormData();
+      form.append('file', blob, `${sheetContext.buyerName || 'Livre'}.pdf`);
+      form.append('folderId', sheetContext.outputFolderId);
+      form.append('spreadsheetId', sheetContext.spreadsheetId);
+      form.append('rowIndex', String(sheetContext.rowIndex));
+      form.append('webhookUrl', sheetContext.webhookUrl);
+      form.append('webhookSecret', sheetContext.webhookSecret);
+      form.append('buyerName', sheetContext.buyerName);
+      if (sheetContext.sheetName) form.append('sheetName', sheetContext.sheetName);
+      const base = BACKEND_URL.replace(/\/$/, '');
+      const res = await fetch(`${base}/uploadPdf`, { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+      setErrorMessage(null);
+      alert(t.bookSent + (data.pdfUrl ? `\n${data.pdfUrl}` : ''));
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Send book to Drive failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSendCoverToDrive = async () => {
     if (!sheetContext || !quickCoverScene?.imageUrl) return;
     setLoading(true);
@@ -2039,20 +2091,32 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.uploadPhoto}</label>
-                    <div className={`relative border-2 border-dashed p-4 rounded-2xl text-center group transition-all ${userInput.photoBase64 ? 'border-amber-400' : 'border-slate-700'}`}>
-                      {userInput.photoBase64 ? (
-                        <div className="relative inline-block h-28 w-28">
-                          <img src={userInput.photoBase64} className="h-full w-full object-cover rounded-xl" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center transition-opacity"><i className="fas fa-edit text-white"></i></div>
+                    {userInput.photoBase64 ? (
+                      <div className="space-y-2">
+                        <div
+                          className="border-2 border-amber-400 p-4 rounded-2xl text-center group transition-all cursor-pointer"
+                          onClick={() => { setCropTarget('reference'); setImageToCrop(userInput.photoBase64!); setCrop({ x: 0, y: 0 }); setZoom(1); }}
+                        >
+                          <div className="relative inline-block h-28 w-28">
+                            <img src={userInput.photoBase64} className="h-full w-full object-cover rounded-xl" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 active:opacity-100 rounded-xl flex items-center justify-center transition-opacity"><i className="fas fa-crop-alt text-white text-lg"></i></div>
+                          </div>
+                          <p className="text-[9px] text-slate-500 mt-1">{uiLanguage === 'French' ? 'Appuyez pour recadrer' : 'Tap to crop'}</p>
                         </div>
-                      ) : (
+                        <label className="block text-center text-[10px] text-amber-400 cursor-pointer hover:underline">
+                          <i className="fas fa-sync-alt mr-1"></i>{uiLanguage === 'French' ? 'Changer la photo' : 'Change photo'}
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'reference')} className="hidden" />
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="relative border-2 border-dashed p-4 rounded-2xl text-center group transition-all border-slate-700">
                         <div className="py-2">
                           <i className="fas fa-user-plus text-2xl text-slate-700 mb-1"></i>
                           <p className="text-slate-500 text-[10px]">{t.uploadPhoto}</p>
                         </div>
-                      )}
-                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'reference')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    </div>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'reference')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                      </div>
+                    )}
                     {userInput.photoBase64 && <QualityBar quality={photoQuality} />}
                   </div>
                 </div>
@@ -2083,20 +2147,32 @@ const App: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">{t.uploadPhoto}</label>
-                      <div className={`relative border-2 border-dashed p-4 rounded-2xl text-center group transition-all ${userInput.partnerPhotoBase64 ? 'border-pink-400' : 'border-slate-700'}`}>
-                        {userInput.partnerPhotoBase64 ? (
-                          <div className="relative inline-block h-28 w-28">
-                            <img src={userInput.partnerPhotoBase64} className="h-full w-full object-cover rounded-xl" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center transition-opacity"><i className="fas fa-edit text-white"></i></div>
+                      {userInput.partnerPhotoBase64 ? (
+                        <div className="space-y-2">
+                          <div
+                            className="border-2 border-pink-400 p-4 rounded-2xl text-center group transition-all cursor-pointer"
+                            onClick={() => { setCropTarget('partner'); setImageToCrop(userInput.partnerPhotoBase64!); setCrop({ x: 0, y: 0 }); setZoom(1); }}
+                          >
+                            <div className="relative inline-block h-28 w-28">
+                              <img src={userInput.partnerPhotoBase64} className="h-full w-full object-cover rounded-xl" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 active:opacity-100 rounded-xl flex items-center justify-center transition-opacity"><i className="fas fa-crop-alt text-white text-lg"></i></div>
+                            </div>
+                            <p className="text-[9px] text-slate-500 mt-1">{uiLanguage === 'French' ? 'Appuyez pour recadrer' : 'Tap to crop'}</p>
                           </div>
-                        ) : (
+                          <label className="block text-center text-[10px] text-pink-400 cursor-pointer hover:underline">
+                            <i className="fas fa-sync-alt mr-1"></i>{uiLanguage === 'French' ? 'Changer la photo' : 'Change photo'}
+                            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'partner')} className="hidden" />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="relative border-2 border-dashed p-4 rounded-2xl text-center group transition-all border-slate-700">
                           <div className="py-2">
                             <i className="fas fa-heart-pulse text-2xl text-slate-700 mb-1"></i>
                             <p className="text-slate-500 text-[10px]">{t.uploadPhoto}</p>
                           </div>
-                        )}
-                        <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'partner')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                      </div>
+                          <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'partner')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                      )}
                       {userInput.partnerPhotoBase64 && <QualityBar quality={partnerPhotoQuality} />}
                     </div>
                   </div>
@@ -2604,10 +2680,16 @@ const App: React.FC = () => {
                     <i className="fas fa-file-pdf"></i>
                     <span>PDF ({2 + innerCount * 2} Pages)</span>
                   </button>
-                  {sheetContext && (
+                  {sheetContext && !sheetBookMode && (
                     <button onClick={handleSendToDrive} disabled={loading} className="bg-blue-600 text-white px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 shadow-xl shadow-blue-600/20 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95 disabled:opacity-50">
                       <i className="fab fa-google-drive"></i>
                       <span>{t.sendToDrive}</span>
+                    </button>
+                  )}
+                  {sheetContext && sheetBookMode && (
+                    <button onClick={handleSendBookToDrive} disabled={loading || !isBookReady} className={`px-4 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95 shadow-xl ${isBookReady ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20' : 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-none'}`} title={!isBookReady ? t.bookNotReady : ''}>
+                      <i className={`fas ${isBookReady ? 'fa-paper-plane' : 'fa-lock'}`}></i>
+                      <span>{t.bookSendToDrive}</span>
                     </button>
                   )}
                 </div>
